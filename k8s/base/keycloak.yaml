@@ -119,8 +119,11 @@ spec:
               if [ -n "${ADMIN_EMAIL:-}" ]; then
                 ADMIN_USER_ID="$($K get users -r daiki -q email="$ADMIN_EMAIL" --fields id --format csv --noquotes | head -n1)"
                 if [ -n "$ADMIN_USER_ID" ]; then
-                  $K add-roles -r daiki --uid "$ADMIN_USER_ID" --rolename ai-user --rolename ai-admin || true
-                  echo configured-admin-role-synced
+                  if $K add-roles -r daiki --uid "$ADMIN_USER_ID" --rolename ai-user --rolename ai-admin; then
+                    echo configured-admin-role-synced
+                  else
+                    echo configured-admin-role-sync-failed
+                  fi
                 else
                   echo configured-admin-user-not-created-yet
                 fi
