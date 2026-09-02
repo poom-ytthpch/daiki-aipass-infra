@@ -63,7 +63,7 @@ spec:
 ---
 apiVersion: batch/v1
 kind: Job
-metadata: {name: keycloak-bootstrap-v1, namespace: daiki-ai-passport}
+metadata: {name: keycloak-bootstrap-v2, namespace: daiki-ai-passport}
 spec:
   backoffLimit: 12
   template:
@@ -77,16 +77,35 @@ spec:
             - {name: KC_BOOTSTRAP_ADMIN_USERNAME, value: bootstrap-admin}
             - {name: KC_BOOTSTRAP_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: keycloak-bootstrap-password}}}
             - {name: DAIKI_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: initial-admin-password}}}
+            - {name: GOOGLE_CLIENT_ID, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: google-client-id, optional: true}}}
+            - {name: GOOGLE_CLIENT_SECRET, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: google-client-secret, optional: true}}}
           command: ["/bin/bash","-ec"]
           args:
             - |
               K=/opt/keycloak/bin/kcadm.sh
               until $K config credentials --server http://keycloak:8080 --realm master --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null 2>&1; do sleep 5; done
-              $K get realms/daiki >/dev/null 2>&1 || $K create realms -s realm=daiki -s enabled=true -s registrationAllowed=false
+              if $K get realms/daiki >/dev/null 2>&1; then
+                $K update realms/daiki -s enabled=true -s registrationAllowed=true -s registrationEmailAsUsername=true -s loginWithEmailAllowed=true -s duplicateEmailsAllowed=false -s resetPasswordAllowed=true -s rememberMe=true -s verifyEmail=false
+              else
+                $K create realms -s realm=daiki -s enabled=true -s registrationAllowed=true -s registrationEmailAsUsername=true -s loginWithEmailAllowed=true -s duplicateEmailsAllowed=false -s resetPasswordAllowed=true -s rememberMe=true -s verifyEmail=false
+              fi
               $K get roles/ai-user -r daiki >/dev/null 2>&1 || $K create roles -r daiki -s name=ai-user -s description='Daiki AI user'
               $K get roles/ai-admin -r daiki >/dev/null 2>&1 || $K create roles -r daiki -s name=ai-admin -s description='Daiki AI administrator'
               if ! $K get clients -r daiki -q clientId=daiki-web --fields id --format csv --noquotes | grep -q .; then
                 $K create clients -r daiki -s clientId=daiki-web -s enabled=true -s publicClient=true -s standardFlowEnabled=true -s directAccessGrantsEnabled=false -s 'redirectUris=["https://ai.infra.local/*"]' -s 'webOrigins=["https://ai.infra.local"]'
+              fi
+              if [ -n "${GOOGLE_CLIENT_ID:-}" ] && [ -n "${GOOGLE_CLIENT_SECRET:-}" ]; then
+                cat >/tmp/google-idp.json <<EOF
+              {"alias":"google","displayName":"Google","providerId":"google","enabled":true,"trustEmail":true,"storeToken":false,"linkOnly":false,"firstBrokerLoginFlowAlias":"first broker login","config":{"clientId":"$GOOGLE_CLIENT_ID","clientSecret":"$GOOGLE_CLIENT_SECRET","defaultScope":"openid profile email","syncMode":"IMPORT"}}
+              EOF
+                if $K get identity-provider/instances/google -r daiki >/dev/null 2>&1; then
+                  $K update identity-provider/instances/google -r daiki -f /tmp/google-idp.json
+                else
+                  $K create identity-provider/instances -r daiki -f /tmp/google-idp.json
+                fi
+                echo google-idp-configured
+              else
+                echo google-idp-not-configured
               fi
               if ! $K get users -r daiki -q username=admin --fields id --format csv --noquotes | grep -q .; then
                 $K create users -r daiki -s username=admin -s enabled=true -s email=admin@daiki.local -s emailVerified=true

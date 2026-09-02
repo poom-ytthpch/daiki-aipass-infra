@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/poom-ytthpch/daiki-ai-passport-frontend:sha-4304ea9
+          image: ghcr.io/poom-ytthpch/daiki-ai-passport-frontend:sha-863e0f1
           ports:
             - {name: http, containerPort: 3000}
           env:
@@ -26,6 +26,7 @@ spec:
             - {name: OIDC_CLIENT_ID, value: daiki-web}
             - {name: OIDC_REDIRECT_URI, value: "https://ai.infra.local/api/auth/callback"}
             - {name: PUBLIC_BASE_URL, value: "https://ai.infra.local"}
+            - {name: GOOGLE_CLIENT_ID, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: google-client-id, optional: true}}}
             - {name: COOKIE_SECURE, value: "true"}
             - {name: SESSION_SECRET, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: session-secret}}}
           readinessProbe:

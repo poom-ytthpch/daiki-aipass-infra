@@ -24,7 +24,7 @@ kind: PodMonitor
 metadata: {name: daiki-apisix, namespace: daiki-ai-passport}
 spec:
   selector: {matchLabels: {app: apisix}}
-  podMetricsEndpoints: [{port: http, path: /apisix/prometheus/metrics, interval: 30s}]
+  podMetricsEndpoints: [{port: metrics, path: /apisix/prometheus/metrics, interval: 30s}]
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
