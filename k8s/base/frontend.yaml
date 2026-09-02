@@ -24,8 +24,8 @@ spec:
             - {name: OIDC_ISSUER, value: "https://api.matchchemical.co/realms/daiki"}
             - {name: OIDC_INTERNAL_ISSUER, value: "http://keycloak:8080/realms/daiki"}
             - {name: OIDC_CLIENT_ID, value: daiki-web}
-            - {name: OIDC_REDIRECT_URI, value: "https://ai.infra.local/api/auth/callback"}
-            - {name: PUBLIC_BASE_URL, value: "https://ai.infra.local"}
+            - {name: OIDC_REDIRECT_URI, value: "https://daiki-aipass.matchchemical.co/api/auth/callback"}
+            - {name: PUBLIC_BASE_URL, value: "https://daiki-aipass.matchchemical.co"}
             - {name: GOOGLE_CLIENT_ID, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: google-client-id, optional: true}}}
             - {name: COOKIE_SECURE, value: "true"}
             - {name: SESSION_SECRET, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: session-secret}}}
@@ -63,6 +63,25 @@ spec:
       secretName: daiki-ai-passport-infra-local-tls
   rules:
     - host: ai.infra.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: frontend, port: {number: 80}}}
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: daiki-ai-passport-public
+  namespace: daiki-ai-passport
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ["daiki-aipass.matchchemical.co"]
+      secretName: daiki-aipass-matchchemical-co-tls
+  rules:
+    - host: daiki-aipass.matchchemical.co
       http:
         paths:
           - path: /

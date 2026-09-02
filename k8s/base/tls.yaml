@@ -26,3 +26,18 @@ spec:
     name: letsencrypt-http01
   dnsNames:
     - api.matchchemical.co
+
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: daiki-aipass-matchchemical-co-tls
+  namespace: daiki-ai-passport
+spec:
+  secretName: daiki-aipass-matchchemical-co-tls
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-http01
+  dnsNames:
+    - daiki-aipass.matchchemical.co

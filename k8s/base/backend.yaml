@@ -47,7 +47,7 @@ spec:
             - {name: PENDING_CHAT_MIN_INTERVAL_SECONDS, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: pending-chat-min-interval-seconds}}}
             - {name: PENDING_CHAT_MAX_COMPLETION_TOKENS, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: pending-chat-max-completion-tokens}}}
             - {name: LOCAL_LLM_BASE_URL, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: local-llm-base-url}}}
-            - {name: ALLOWED_ORIGINS, value: "https://ai.infra.local"}
+            - {name: ALLOWED_ORIGINS, value: "https://daiki-aipass.matchchemical.co,https://ai.infra.local"}
           readinessProbe:
             httpGet: {path: /v1/health/ready, port: http}
             initialDelaySeconds: 5
