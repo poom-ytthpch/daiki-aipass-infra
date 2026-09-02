@@ -42,8 +42,16 @@ unset GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET ID_B64 SECRET_B64
 echo "Google OAuth credentials stored in Kubernetes Secret."
 
 RUN_JOB="keycloak-bootstrap-google-$(date +%s)"
-kubectl --context "$CONTEXT" -n "$NAMESPACE" create job \
-  --from="job/$BOOTSTRAP_JOB" "$RUN_JOB" >/dev/null
+kubectl --context "$CONTEXT" -n "$NAMESPACE" get job "$BOOTSTRAP_JOB" -o json |
+  jq --arg name "$RUN_JOB" '''
+    del(.metadata.creationTimestamp,.metadata.generation,.metadata.resourceVersion,.metadata.uid,.metadata.managedFields,.status,
+        .spec.selector,.spec.template.metadata.creationTimestamp,
+        .spec.template.metadata.labels["controller-uid"],
+        .spec.template.metadata.labels["batch.kubernetes.io/controller-uid"],
+        .spec.template.metadata.labels["batch.kubernetes.io/job-name"],
+        .spec.template.metadata.labels["job-name"]) |
+    .metadata.name=$name
+  ''' | kubectl --context "$CONTEXT" -n "$NAMESPACE" create -f - >/dev/null
 
 echo "Running Keycloak Google IdP bootstrap: $RUN_JOB"
 kubectl --context "$CONTEXT" -n "$NAMESPACE" wait \
