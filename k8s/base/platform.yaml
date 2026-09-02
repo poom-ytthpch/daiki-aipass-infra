@@ -41,7 +41,7 @@ spec:
       containers:
         - name: litellm
           image: ghcr.io/berriai/litellm:main-stable
-          args: ["--config","/app/config.yaml","--port","4000","--num_workers","2"]
+          args: ["--config","/app/config.yaml","--port","4000","--num_workers","1"]
           ports: [{name: http, containerPort: 4000}]
           env:
             - {name: LOCAL_LLM_BASE_URL, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: local-llm-base-url}}}
@@ -50,11 +50,12 @@ spec:
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: database-url}}}
             - {name: REDIS_HOST, value: daiki-redis}
             - {name: REDIS_PORT, value: "6379"}
-          readinessProbe: {httpGet: {path: /health/readiness, port: http}, initialDelaySeconds: 20, periodSeconds: 10, failureThreshold: 12}
-          livenessProbe: {httpGet: {path: /health/liveliness, port: http}, initialDelaySeconds: 35, periodSeconds: 20}
+          startupProbe: {httpGet: {path: /health/liveliness, port: http}, periodSeconds: 5, failureThreshold: 60}
+          readinessProbe: {httpGet: {path: /health/readiness, port: http}, periodSeconds: 10, failureThreshold: 12}
+          livenessProbe: {httpGet: {path: /health/liveliness, port: http}, periodSeconds: 20, failureThreshold: 6}
           resources:
-            requests: {cpu: 100m, memory: 256Mi}
-            limits: {cpu: "1", memory: 1Gi}
+            requests: {cpu: 100m, memory: 512Mi}
+            limits: {cpu: "1", memory: 2Gi}
           volumeMounts: [{name: config, mountPath: /app/config.yaml, subPath: config.yaml, readOnly: true}]
       volumes: [{name: config, configMap: {name: litellm-config}}]
 ---

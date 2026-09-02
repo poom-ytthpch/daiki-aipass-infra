@@ -24,8 +24,9 @@ spec:
             - {name: KC_HOSTNAME, value: "https://auth.ai.infra.local"}
             - {name: KC_PROXY_HEADERS, value: xforwarded}
             - {name: KC_METRICS_ENABLED, value: "true"}
-          readinessProbe: {httpGet: {path: /health/ready, port: management}, initialDelaySeconds: 20, periodSeconds: 10, failureThreshold: 12}
-          livenessProbe: {httpGet: {path: /health/live, port: management}, initialDelaySeconds: 35, periodSeconds: 20}
+          startupProbe: {httpGet: {path: /health/started, port: management}, periodSeconds: 5, failureThreshold: 60}
+          readinessProbe: {httpGet: {path: /health/ready, port: management}, periodSeconds: 10, failureThreshold: 12}
+          livenessProbe: {httpGet: {path: /health/live, port: management}, periodSeconds: 20, failureThreshold: 6}
           resources:
             requests: {cpu: 150m, memory: 512Mi}
             limits: {cpu: "1", memory: 1400Mi}
