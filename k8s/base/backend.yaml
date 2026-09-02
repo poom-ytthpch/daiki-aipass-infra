@@ -25,6 +25,7 @@ spec:
             - {name: KEYCLOAK_REALM, value: daiki}
             - {name: KEYCLOAK_ADMIN_USER, value: bootstrap-admin}
             - {name: KEYCLOAK_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: keycloak-bootstrap-password}}}
+            - {name: ADMIN_EMAIL, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: admin-email}}}
             - {name: LITELLM_BASE_URL, value: "http://litellm:4000"}
             - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: backend-database-url}}}

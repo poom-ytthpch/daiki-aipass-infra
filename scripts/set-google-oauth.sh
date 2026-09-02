@@ -4,7 +4,7 @@ set -euo pipefail
 CONTEXT="${KUBE_CONTEXT:-match-infra-tunnel}"
 NAMESPACE="${KUBE_NAMESPACE:-daiki-ai-passport}"
 SECRET_NAME="daiki-ai-passport-secrets"
-BOOTSTRAP_JOB="keycloak-bootstrap-v4"
+BOOTSTRAP_JOB="keycloak-bootstrap-v5"
 
 command -v kubectl >/dev/null 2>&1 || { echo "ERROR: kubectl not found" >&2; exit 1; }
 command -v openssl >/dev/null 2>&1 || { echo "ERROR: openssl not found" >&2; exit 1; }

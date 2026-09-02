@@ -27,6 +27,7 @@ spec:
             - {name: OIDC_REDIRECT_URI, value: "https://daiki-aipass.matchchemical.co/api/auth/callback"}
             - {name: PUBLIC_BASE_URL, value: "https://daiki-aipass.matchchemical.co"}
             - {name: GOOGLE_CLIENT_ID, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: google-client-id, optional: true}}}
+            - {name: ADMIN_EMAIL, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: admin-email}}}
             - {name: COOKIE_SECURE, value: "true"}
             - {name: SESSION_SECRET, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: session-secret}}}
           readinessProbe:

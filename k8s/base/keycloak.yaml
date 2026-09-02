@@ -63,7 +63,7 @@ spec:
 ---
 apiVersion: batch/v1
 kind: Job
-metadata: {name: keycloak-bootstrap-v4, namespace: daiki-ai-passport}
+metadata: {name: keycloak-bootstrap-v5, namespace: daiki-ai-passport}
 spec:
   backoffLimit: 12
   template:
@@ -77,6 +77,7 @@ spec:
             - {name: KC_BOOTSTRAP_ADMIN_USERNAME, value: bootstrap-admin}
             - {name: KC_BOOTSTRAP_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: keycloak-bootstrap-password}}}
             - {name: DAIKI_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: initial-admin-password}}}
+            - {name: ADMIN_EMAIL, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: admin-email}}}
             - {name: GOOGLE_CLIENT_ID, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: google-client-id, optional: true}}}
             - {name: GOOGLE_CLIENT_SECRET, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: google-client-secret, optional: true}}}
           command: ["/bin/bash","-ec"]
@@ -114,6 +115,15 @@ spec:
                 $K create users -r daiki -s username=admin -s enabled=true -s email=admin@daiki.local -s emailVerified=true
                 $K set-password -r daiki --username admin --new-password "$DAIKI_ADMIN_PASSWORD"
                 $K add-roles -r daiki --uusername admin --rolename ai-user --rolename ai-admin
+              fi
+              if [ -n "${ADMIN_EMAIL:-}" ]; then
+                ADMIN_USER_ID="$($K get users -r daiki -q email="$ADMIN_EMAIL" --fields id --format csv --noquotes | head -n1)"
+                if [ -n "$ADMIN_USER_ID" ]; then
+                  $K add-roles -r daiki --uid "$ADMIN_USER_ID" --rolename ai-user --rolename ai-admin || true
+                  echo configured-admin-role-synced
+                else
+                  echo configured-admin-user-not-created-yet
+                fi
               fi
               echo bootstrap-complete
 
