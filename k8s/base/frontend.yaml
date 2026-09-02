@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: daiki-ai-passport
+spec:
+  ports:
+    - {name: http, port: 80, targetPort: 3100}
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: frontend-host
+  namespace: daiki-ai-passport
+  labels:
+    kubernetes.io/service-name: frontend
+addressType: IPv4
+ports:
+  - {name: http, protocol: TCP, port: 3100}
+endpoints:
+  - addresses: ["192.168.1.52"]
+    conditions: {ready: true}

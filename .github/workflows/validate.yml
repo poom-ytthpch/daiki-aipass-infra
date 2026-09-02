@@ -1,0 +1,26 @@
+name: Validate manifests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-kubectl@v4
+      - name: Install kubeconform
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo install kubeconform /usr/local/bin/kubeconform
+      - name: Render
+        run: kubectl kustomize k8s/overlays/match-infra > /tmp/daiki.yaml
+      - name: Validate
+        run: kubeconform -strict -summary -ignore-missing-schemas /tmp/daiki.yaml
+      - name: Check for committed secrets
+        run: |
+          if grep -RIE 'BEGIN PRIVATE KEY|sk-[A-Za-z0-9]{16,}|password:[[:space:]]+[^C<]' --exclude='secret.example.yaml' .; then
+            echo 'Potential secret detected'; exit 1
+          fi

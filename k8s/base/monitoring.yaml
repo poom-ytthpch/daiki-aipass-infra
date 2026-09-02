@@ -1,0 +1,52 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata: {name: daiki-backend, namespace: daiki-ai-passport}
+spec:
+  selector: {matchLabels: {app: backend}}
+  podMetricsEndpoints: [{port: http, path: /metrics, interval: 30s}]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata: {name: daiki-litellm, namespace: daiki-ai-passport}
+spec:
+  selector: {matchLabels: {app: litellm}}
+  podMetricsEndpoints: [{port: http, path: /metrics, interval: 30s}]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata: {name: daiki-keycloak, namespace: daiki-ai-passport}
+spec:
+  selector: {matchLabels: {app: keycloak}}
+  podMetricsEndpoints: [{port: management, path: /metrics, interval: 30s}]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata: {name: daiki-apisix, namespace: daiki-ai-passport}
+spec:
+  selector: {matchLabels: {app: apisix}}
+  podMetricsEndpoints: [{port: http, path: /apisix/prometheus/metrics, interval: 30s}]
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata: {name: daiki-ai-passport, namespace: daiki-ai-passport}
+spec:
+  groups:
+    - name: daiki-ai-passport
+      rules:
+        - alert: DaikiPodUnavailable
+          expr: kube_deployment_status_replicas_available{namespace="daiki-ai-passport"} < kube_deployment_spec_replicas{namespace="daiki-ai-passport"}
+          for: 10m
+          labels: {severity: warning}
+          annotations:
+            summary: "Daiki AI Passport deployment unavailable"
+            description: "One or more Daiki control-plane deployments have unavailable replicas for 10 minutes."
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-daiki-ai-passport
+  namespace: monitoring
+  labels: {grafana_dashboard: "1"}
+data:
+  daiki-ai-passport.json: |
+    {"title":"Daiki AI Passport","uid":"daiki-ai-passport","schemaVersion":39,"version":2,"refresh":"30s","time":{"from":"now-6h","to":"now"},"panels":[{"type":"stat","title":"Daiki Ready Pods","targets":[{"expr":"sum(kube_pod_status_ready{namespace=\"daiki-ai-passport\",condition=\"true\"})","refId":"A"}],"gridPos":{"h":6,"w":6,"x":0,"y":0}},{"type":"timeseries","title":"CPU Usage","targets":[{"expr":"sum(rate(container_cpu_usage_seconds_total{namespace=\"daiki-ai-passport\",container!=\"\"}[5m]))","refId":"A"}],"gridPos":{"h":8,"w":18,"x":6,"y":0}}],"templating":{"list":[]}}

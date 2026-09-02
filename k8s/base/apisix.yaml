@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: apisix-config, namespace: daiki-ai-passport}
+data:
+  config.yaml: |
+    apisix:
+      node_listen: [9080]
+      enable_admin: false
+    deployment:
+      role: data_plane
+      role_data_plane:
+        config_provider: yaml
+  apisix.yaml: |
+    global_rules:
+      - id: 1
+        plugins:
+          prometheus: {}
+    routes:
+      - id: daiki-backend
+        name: daiki-backend
+        uri: "/v1/*"
+        priority: 20
+        plugins:
+          limit-count:
+            count: 300
+            time_window: 60
+            rejected_code: 429
+            key_type: var
+            key: remote_addr
+        upstream:
+          type: roundrobin
+          nodes:
+            "backend.daiki-ai-passport.svc.cluster.local:8080": 1
+      - id: daiki-backend-health
+        name: daiki-backend-health
+        uri: "/health/*"
+        priority: 10
+        upstream:
+          type: roundrobin
+          nodes:
+            "backend.daiki-ai-passport.svc.cluster.local:8080": 1
+    #END
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: apisix, namespace: daiki-ai-passport}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: apisix}}
+  template:
+    metadata: {labels: {app: apisix}}
+    spec:
+      containers:
+        - name: apisix
+          image: apache/apisix:3.18.0-debian
+          ports: [{name: http, containerPort: 9080}]
+          readinessProbe: {tcpSocket: {port: http}, initialDelaySeconds: 8, periodSeconds: 10}
+          livenessProbe: {tcpSocket: {port: http}, initialDelaySeconds: 15, periodSeconds: 20}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 700m, memory: 512Mi}
+          volumeMounts:
+            - {name: config, mountPath: /usr/local/apisix/conf/config.yaml, subPath: config.yaml, readOnly: true}
+            - {name: config, mountPath: /usr/local/apisix/conf/apisix.yaml, subPath: apisix.yaml, readOnly: true}
+      volumes: [{name: config, configMap: {name: apisix-config}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: apisix, namespace: daiki-ai-passport}
+spec:
+  type: NodePort
+  selector: {app: apisix}
+  ports: [{name: http, port: 80, targetPort: http, nodePort: 30402}]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: daiki-ai-passport-api
+  namespace: daiki-ai-passport
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "360"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "360"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ["api.ai.infra.local"]
+      secretName: daiki-ai-passport-infra-local-tls
+  rules:
+    - host: api.ai.infra.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: apisix, port: {number: 80}}}

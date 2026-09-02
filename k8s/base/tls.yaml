@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: daiki-ai-passport-infra-local-tls
+  namespace: daiki-ai-passport
+spec:
+  secretName: daiki-ai-passport-infra-local-tls
+  issuerRef:
+    kind: ClusterIssuer
+    name: sws-selfsigned-cluster-issuer
+  dnsNames:
+    - ai.infra.local
+    - api.ai.infra.local
+    - auth.ai.infra.local

@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: keycloak, namespace: daiki-ai-passport}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: keycloak}}
+  template:
+    metadata: {labels: {app: keycloak}}
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.7.3
+          args: ["start","--http-enabled=true","--health-enabled=true"]
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: management, containerPort: 9000}
+          env:
+            - {name: KC_DB, value: postgres}
+            - {name: KC_DB_URL, value: "jdbc:postgresql://daiki-postgres:5432/keycloak"}
+            - {name: KC_DB_USERNAME, value: daiki}
+            - {name: KC_DB_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: postgres-password}}}
+            - {name: KC_BOOTSTRAP_ADMIN_USERNAME, value: bootstrap-admin}
+            - {name: KC_BOOTSTRAP_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: keycloak-bootstrap-password}}}
+            - {name: KC_HOSTNAME, value: "https://auth.ai.infra.local"}
+            - {name: KC_PROXY_HEADERS, value: xforwarded}
+            - {name: KC_METRICS_ENABLED, value: "true"}
+          readinessProbe: {httpGet: {path: /health/ready, port: management}, initialDelaySeconds: 20, periodSeconds: 10, failureThreshold: 12}
+          livenessProbe: {httpGet: {path: /health/live, port: management}, initialDelaySeconds: 35, periodSeconds: 20}
+          resources:
+            requests: {cpu: 150m, memory: 512Mi}
+            limits: {cpu: "1", memory: 1400Mi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: keycloak, namespace: daiki-ai-passport}
+spec:
+  type: NodePort
+  selector: {app: keycloak}
+  ports:
+    - {name: http, port: 8080, targetPort: http, nodePort: 30401}
+    - {name: management, port: 9000, targetPort: management}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak
+  namespace: daiki-ai-passport
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ["auth.ai.infra.local"]
+      secretName: daiki-ai-passport-infra-local-tls
+  rules:
+    - host: auth.ai.infra.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: keycloak, port: {number: 8080}}}
+---
+apiVersion: batch/v1
+kind: Job
+metadata: {name: keycloak-bootstrap-v1, namespace: daiki-ai-passport}
+spec:
+  backoffLimit: 12
+  template:
+    metadata: {labels: {app: keycloak-bootstrap}}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: bootstrap
+          image: quay.io/keycloak/keycloak:26.7.3
+          env:
+            - {name: KC_BOOTSTRAP_ADMIN_USERNAME, value: bootstrap-admin}
+            - {name: KC_BOOTSTRAP_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: keycloak-bootstrap-password}}}
+            - {name: DAIKI_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: initial-admin-password}}}
+          command: ["/bin/bash","-ec"]
+          args:
+            - |
+              K=/opt/keycloak/bin/kcadm.sh
+              until $K config credentials --server http://keycloak:8080 --realm master --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null 2>&1; do sleep 5; done
+              $K get realms/daiki >/dev/null 2>&1 || $K create realms -s realm=daiki -s enabled=true -s registrationAllowed=false
+              $K get roles/ai-user -r daiki >/dev/null 2>&1 || $K create roles -r daiki -s name=ai-user -s description='Daiki AI user'
+              $K get roles/ai-admin -r daiki >/dev/null 2>&1 || $K create roles -r daiki -s name=ai-admin -s description='Daiki AI administrator'
+              if ! $K get clients -r daiki -q clientId=daiki-web --fields id --format csv --noquotes | grep -q .; then
+                $K create clients -r daiki -s clientId=daiki-web -s enabled=true -s publicClient=true -s standardFlowEnabled=true -s directAccessGrantsEnabled=false -s 'redirectUris=["https://ai.infra.local/*"]' -s 'webOrigins=["https://ai.infra.local"]'
+              fi
+              if ! $K get users -r daiki -q username=admin --fields id --format csv --noquotes | grep -q .; then
+                $K create users -r daiki -s username=admin -s enabled=true -s email=admin@daiki.local -s emailVerified=true
+                $K set-password -r daiki --username admin --new-password "$DAIKI_ADMIN_PASSWORD"
+                $K add-roles -r daiki --uusername admin --rolename ai-user --rolename ai-admin
+              fi
+              echo bootstrap-complete

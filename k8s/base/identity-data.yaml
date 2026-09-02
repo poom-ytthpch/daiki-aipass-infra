@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: daiki-postgres-init, namespace: daiki-ai-passport}
+data:
+  01-databases.sql: |
+    CREATE DATABASE keycloak;
+    CREATE DATABASE litellm;
+    CREATE DATABASE backend;
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: daiki-postgres, namespace: daiki-ai-passport}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 5Gi}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: daiki-postgres, namespace: daiki-ai-passport}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: daiki-postgres}}
+  template:
+    metadata: {labels: {app: daiki-postgres}}
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports: [{name: postgres, containerPort: 5432}]
+          env:
+            - {name: POSTGRES_DB, value: postgres}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            - {name: POSTGRES_USER, value: daiki}
+            - {name: POSTGRES_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: postgres-password}}}
+          readinessProbe: {exec: {command: [sh,-c,"pg_isready -U daiki -d postgres"]}, initialDelaySeconds: 5, periodSeconds: 5}
+          resources:
+            requests: {cpu: 100m, memory: 192Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: init, mountPath: /docker-entrypoint-initdb.d/01-databases.sql, subPath: 01-databases.sql, readOnly: true}
+      volumes:
+        - {name: data, persistentVolumeClaim: {claimName: daiki-postgres}}
+        - {name: init, configMap: {name: daiki-postgres-init}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: daiki-postgres, namespace: daiki-ai-passport}
+spec:
+  selector: {app: daiki-postgres}
+  ports: [{name: postgres, port: 5432, targetPort: postgres}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: daiki-redis, namespace: daiki-ai-passport}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: daiki-redis}}
+  template:
+    metadata: {labels: {app: daiki-redis}}
+    spec:
+      containers:
+        - name: redis
+          image: redis:8-alpine
+          args: ["redis-server","--save","","--appendonly","no","--maxmemory","192mb","--maxmemory-policy","allkeys-lru"]
+          ports: [{name: redis, containerPort: 6379}]
+          readinessProbe: {exec: {command: [redis-cli,ping]}, initialDelaySeconds: 3, periodSeconds: 5}
+          resources:
+            requests: {cpu: 25m, memory: 64Mi}
+            limits: {cpu: 300m, memory: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: daiki-redis, namespace: daiki-ai-passport}
+spec:
+  selector: {app: daiki-redis}
+  ports: [{name: redis, port: 6379, targetPort: redis}]

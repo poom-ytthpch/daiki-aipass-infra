@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: daiki-ai-passport-runtime
+  namespace: daiki-ai-passport
+data:
+  local-llm-base-url: "http://10.90.0.11:8000/v1"
+  model-fast: "qwen-local"
+  model-balanced: "qwen-local"
+  model-deep: "qwen-local"
+  model-vision: "disabled"
+  inference-global-concurrency: "4"
+  inference-fast-concurrency: "4"
+  inference-deep-concurrency: "1"
+  inference-vision-concurrency: "1"
+  inference-image-concurrency: "1"
+  inference-embedding-concurrency: "2"
+  inference-batch-concurrency: "1"
+  inference-lease-seconds: "30"
+  inference-max-wait-seconds: "120"
+  pending-chat-token-limit: "8000"
+  pending-chat-requests-per-hour: "10"
+  pending-chat-min-interval-seconds: "30"
+  pending-chat-max-completion-tokens: "512"
