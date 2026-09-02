@@ -21,7 +21,7 @@ spec:
             - {name: KC_DB_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: postgres-password}}}
             - {name: KC_BOOTSTRAP_ADMIN_USERNAME, value: bootstrap-admin}
             - {name: KC_BOOTSTRAP_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: keycloak-bootstrap-password}}}
-            - {name: KC_HOSTNAME, value: "https://auth.ai.infra.local"}
+            - {name: KC_HOSTNAME, value: "https://api.matchchemical.co"}
             - {name: KC_PROXY_HEADERS, value: xforwarded}
             - {name: KC_METRICS_ENABLED, value: "true"}
           startupProbe: {httpGet: {path: /health/started, port: management}, periodSeconds: 5, failureThreshold: 60}
@@ -63,7 +63,7 @@ spec:
 ---
 apiVersion: batch/v1
 kind: Job
-metadata: {name: keycloak-bootstrap-v2, namespace: daiki-ai-passport}
+metadata: {name: keycloak-bootstrap-v3, namespace: daiki-ai-passport}
 spec:
   backoffLimit: 12
   template:
@@ -113,3 +113,27 @@ spec:
                 $K add-roles -r daiki --uusername admin --rolename ai-user --rolename ai-admin
               fi
               echo bootstrap-complete
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak-public
+  namespace: daiki-ai-passport
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ["api.matchchemical.co"]
+      secretName: daiki-ai-passport-public-auth-tls
+  rules:
+    - host: api.matchchemical.co
+      http:
+        paths:
+          - path: /realms/daiki
+            pathType: Prefix
+            backend: {service: {name: keycloak, port: {number: 8080}}}
+          - path: /resources
+            pathType: Prefix
+            backend: {service: {name: keycloak, port: {number: 8080}}}

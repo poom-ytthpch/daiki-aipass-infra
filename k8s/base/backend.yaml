@@ -18,7 +18,7 @@ spec:
             - {name: http, containerPort: 8080}
           env:
             - {name: ADDR, value: ":8080"}
-            - {name: OIDC_ISSUER, value: "https://auth.ai.infra.local/realms/daiki"}
+            - {name: OIDC_ISSUER, value: "https://api.matchchemical.co/realms/daiki"}
             - {name: OIDC_JWKS_URL, value: "http://keycloak:8080/realms/daiki/protocol/openid-connect/certs"}
             - {name: OIDC_CLIENT_ID, value: daiki-web}
             - {name: KEYCLOAK_BASE_URL, value: "http://keycloak:8080"}

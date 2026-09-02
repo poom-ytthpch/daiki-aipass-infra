@@ -12,3 +12,17 @@ spec:
     - ai.infra.local
     - api.ai.infra.local
     - auth.ai.infra.local
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: daiki-ai-passport-public-auth-tls
+  namespace: daiki-ai-passport
+spec:
+  secretName: daiki-ai-passport-public-auth-tls
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-http01
+  dnsNames:
+    - api.matchchemical.co
