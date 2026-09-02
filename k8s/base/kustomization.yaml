@@ -6,6 +6,7 @@ resources:
   - identity-data.yaml
   - keycloak.yaml
   - backend.yaml
+  - frontend.yaml
   - apisix.yaml
   - tls.yaml
   - monitoring.yaml

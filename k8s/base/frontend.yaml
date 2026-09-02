@@ -1,22 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: daiki-ai-passport
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: frontend}
+  template:
+    metadata:
+      labels: {app: frontend}
+    spec:
+      containers:
+        - name: frontend
+          image: ghcr.io/poom-ytthpch/daiki-ai-passport-frontend:0.1.0
+          ports:
+            - {name: http, containerPort: 3000}
+          env:
+            - {name: NODE_ENV, value: production}
+            - {name: PORT, value: "3000"}
+            - {name: HOSTNAME, value: "0.0.0.0"}
+            - {name: DAIKI_BACKEND_URL, value: "http://backend:8080"}
+            - {name: OIDC_ISSUER, value: "https://auth.ai.infra.local/realms/daiki"}
+            - {name: OIDC_INTERNAL_ISSUER, value: "http://keycloak:8080/realms/daiki"}
+            - {name: OIDC_CLIENT_ID, value: daiki-web}
+            - {name: OIDC_REDIRECT_URI, value: "https://ai.infra.local/api/auth/callback"}
+            - {name: PUBLIC_BASE_URL, value: "https://ai.infra.local"}
+            - {name: COOKIE_SECURE, value: "true"}
+            - {name: SESSION_SECRET, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: session-secret}}}
+          readinessProbe:
+            httpGet: {path: /api/health, port: http}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /api/health, port: http}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {cpu: 500m, memory: 384Mi}
+---
 apiVersion: v1
 kind: Service
 metadata:
   name: frontend
   namespace: daiki-ai-passport
 spec:
+  selector: {app: frontend}
   ports:
-    - {name: http, port: 80, targetPort: 3100}
+    - {name: http, port: 80, targetPort: http}
 ---
-apiVersion: discovery.k8s.io/v1
-kind: EndpointSlice
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
-  name: frontend-host
+  name: daiki-ai-passport
   namespace: daiki-ai-passport
-  labels:
-    kubernetes.io/service-name: frontend
-addressType: IPv4
-ports:
-  - {name: http, protocol: TCP, port: 3100}
-endpoints:
-  - addresses: ["192.168.1.52"]
-    conditions: {ready: true}
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ["ai.infra.local"]
+      secretName: daiki-ai-passport-infra-local-tls
+  rules:
+    - host: ai.infra.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: frontend, port: {number: 80}}}

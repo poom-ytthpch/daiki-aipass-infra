@@ -48,7 +48,9 @@ spec:
   replicas: 1
   selector: {matchLabels: {app: apisix}}
   template:
-    metadata: {labels: {app: apisix}}
+    metadata:
+      labels: {app: apisix}
+      annotations: {daiki.ai/config-revision: "2026-09-02-1"}
     spec:
       containers:
         - name: apisix
