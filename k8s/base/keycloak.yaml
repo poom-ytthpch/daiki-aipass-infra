@@ -63,7 +63,7 @@ spec:
 ---
 apiVersion: batch/v1
 kind: Job
-metadata: {name: keycloak-bootstrap-v10, namespace: daiki-ai-passport}
+metadata: {name: keycloak-bootstrap-v11, namespace: daiki-ai-passport}
 spec:
   backoffLimit: 12
   template:
@@ -86,9 +86,9 @@ spec:
               K=/opt/keycloak/bin/kcadm.sh
               until $K config credentials --server http://keycloak:8080 --realm master --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD" >/dev/null 2>&1; do sleep 5; done
               if $K get realms/daiki >/dev/null 2>&1; then
-                $K update realms/daiki -s enabled=true -s registrationAllowed=true -s registrationEmailAsUsername=true -s loginWithEmailAllowed=true -s duplicateEmailsAllowed=false -s resetPasswordAllowed=true -s rememberMe=true -s verifyEmail=false
+                $K update realms/daiki -s enabled=true -s registrationAllowed=true -s registrationEmailAsUsername=true -s loginWithEmailAllowed=true -s duplicateEmailsAllowed=false -s resetPasswordAllowed=true -s rememberMe=true -s verifyEmail=false -s accessTokenLifespan=300 -s ssoSessionIdleTimeout=604800 -s ssoSessionMaxLifespan=2592000 -s ssoSessionIdleTimeoutRememberMe=2592000 -s ssoSessionMaxLifespanRememberMe=5184000
               else
-                $K create realms -s realm=daiki -s enabled=true -s registrationAllowed=true -s registrationEmailAsUsername=true -s loginWithEmailAllowed=true -s duplicateEmailsAllowed=false -s resetPasswordAllowed=true -s rememberMe=true -s verifyEmail=false
+                $K create realms -s realm=daiki -s enabled=true -s registrationAllowed=true -s registrationEmailAsUsername=true -s loginWithEmailAllowed=true -s duplicateEmailsAllowed=false -s resetPasswordAllowed=true -s rememberMe=true -s verifyEmail=false -s accessTokenLifespan=300 -s ssoSessionIdleTimeout=604800 -s ssoSessionMaxLifespan=2592000 -s ssoSessionIdleTimeoutRememberMe=2592000 -s ssoSessionMaxLifespanRememberMe=5184000
               fi
               $K get roles/ai-user -r daiki >/dev/null 2>&1 || $K create roles -r daiki -s name=ai-user -s description='Daiki AI user'
               $K get roles/ai-admin -r daiki >/dev/null 2>&1 || $K create roles -r daiki -s name=ai-admin -s description='Daiki AI administrator'
