@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: ghcr.io/poom-ytthpch/daiki-ai-passport-backend:sha-73bef27
+          image: ghcr.io/poom-ytthpch/daiki-ai-passport-backend:sha-cd445c7
           ports:
             - {name: http, containerPort: 8080}
           env:
@@ -62,9 +62,25 @@ spec:
             httpGet: {path: /v1/health/live, port: http}
             initialDelaySeconds: 5
             periodSeconds: 20
+          volumeMounts:
+            - {name: attachment-data, mountPath: /data/attachments}
           resources:
             requests: {cpu: 25m, memory: 32Mi}
-            limits: {cpu: 500m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+      volumes:
+        - name: attachment-data
+          persistentVolumeClaim: {claimName: daiki-attachments}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: daiki-attachments
+  namespace: daiki-ai-passport
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests: {storage: 10Gi}
 ---
 apiVersion: v1
 kind: Service
