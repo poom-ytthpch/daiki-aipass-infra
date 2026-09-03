@@ -35,6 +35,9 @@ spec:
             - {name: TOKEN_ENCRYPTION_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: token-encryption-key}}}
             - {name: APP_BASE_URL, value: "https://daiki-aipass.matchchemical.co"}
             - {name: LITELLM_BASE_URL, value: "http://litellm:4000"}
+            - {name: SEARXNG_BASE_URL, value: "http://searxng:8080"}
+            - {name: WEB_RESEARCH_MAX_RESULTS, value: "5"}
+            - {name: WEB_RESEARCH_FETCH_PAGES, value: "3"}
             - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: backend-database-url}}}
             - {name: REDIS_ADDR, value: "daiki-redis:6379"}
