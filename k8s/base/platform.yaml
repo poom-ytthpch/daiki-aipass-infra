@@ -48,14 +48,15 @@ spec:
             - {name: LOCAL_LLM_API_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: local-llm-api-key}}}
             - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: database-url}}}
+            - {name: STORE_MODEL_IN_DB, value: "True"}
             - {name: REDIS_HOST, value: daiki-redis}
             - {name: REDIS_PORT, value: "6379"}
-          startupProbe: {httpGet: {path: /health/liveliness, port: http}, periodSeconds: 5, failureThreshold: 60}
-          readinessProbe: {httpGet: {path: /health/readiness, port: http}, periodSeconds: 10, failureThreshold: 12}
-          livenessProbe: {httpGet: {path: /health/liveliness, port: http}, periodSeconds: 20, failureThreshold: 6}
+          startupProbe: {httpGet: {path: /health/liveliness, port: http}, timeoutSeconds: 5, periodSeconds: 5, failureThreshold: 120}
+          readinessProbe: {httpGet: {path: /health/readiness, port: http}, timeoutSeconds: 5, periodSeconds: 10, failureThreshold: 18}
+          livenessProbe: {httpGet: {path: /health/liveliness, port: http}, timeoutSeconds: 5, periodSeconds: 20, failureThreshold: 9}
           resources:
-            requests: {cpu: 100m, memory: 512Mi}
-            limits: {cpu: "1", memory: 2Gi}
+            requests: {cpu: 150m, memory: 512Mi}
+            limits: {cpu: "1500m", memory: 2Gi}
           volumeMounts: [{name: config, mountPath: /app/config.yaml, subPath: config.yaml, readOnly: true}]
       volumes: [{name: config, configMap: {name: litellm-config}}]
 ---

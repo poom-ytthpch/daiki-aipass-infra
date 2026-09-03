@@ -10,7 +10,15 @@ kind: PodMonitor
 metadata: {name: daiki-litellm, namespace: daiki-ai-passport}
 spec:
   selector: {matchLabels: {app: litellm}}
-  podMetricsEndpoints: [{port: http, path: /metrics, interval: 30s}]
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      authorization:
+        type: Bearer
+        credentials:
+          name: daiki-ai-passport-secrets
+          key: litellm-master-key
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
