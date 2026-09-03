@@ -26,6 +26,10 @@ spec:
             - {name: KEYCLOAK_ADMIN_USER, value: bootstrap-admin}
             - {name: KEYCLOAK_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: keycloak-bootstrap-password}}}
             - {name: ADMIN_EMAIL, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: admin-email}}}
+            - {name: GOOGLE_CLIENT_ID, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: google-client-id}}}
+            - {name: GOOGLE_CLIENT_SECRET, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: google-client-secret}}}
+            - {name: GMAIL_OAUTH_REDIRECT_URI, value: "https://daiki-aipass.matchchemical.co/api/admin/integrations/gmail/callback"}
+            - {name: TOKEN_ENCRYPTION_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: token-encryption-key}}}
             - {name: APP_BASE_URL, value: "https://daiki-aipass.matchchemical.co"}
             - {name: LITELLM_BASE_URL, value: "http://litellm:4000"}
             - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
