@@ -63,7 +63,7 @@ spec:
 ---
 apiVersion: batch/v1
 kind: Job
-metadata: {name: keycloak-bootstrap-v8, namespace: daiki-ai-passport}
+metadata: {name: keycloak-bootstrap-v9, namespace: daiki-ai-passport}
 spec:
   backoffLimit: 12
   template:
@@ -98,7 +98,13 @@ spec:
               else
                 $K update clients/$CLIENT_ID -r daiki -s enabled=true -s publicClient=true -s standardFlowEnabled=true -s directAccessGrantsEnabled=false -s 'redirectUris=["https://daiki-aipass.matchchemical.co/*","https://ai.infra.local/*"]' -s 'webOrigins=["https://daiki-aipass.matchchemical.co","https://ai.infra.local"]'
               fi
-              PROVIDER_MAPPER_ID="$($K get clients/$CLIENT_ID/protocol-mappers/models -r daiki --fields id,name --format csv --noquotes 2>/dev/null | awk -F, '$2=="identity-provider"{print $1; exit}')"
+              PROVIDER_MAPPER_ID=""
+              while IFS=, read -r mapper_id mapper_name; do
+                if [ "$mapper_name" = "identity-provider" ]; then
+                  PROVIDER_MAPPER_ID="$mapper_id"
+                  break
+                fi
+              done < <($K get clients/$CLIENT_ID/protocol-mappers/models -r daiki --fields id,name --format csv --noquotes 2>/dev/null || true)
               cat >/tmp/identity-provider-mapper.json <<'EOF'
               {"name":"identity-provider","protocol":"openid-connect","protocolMapper":"oidc-usersessionmodel-note-mapper","consentRequired":false,"config":{"user.session.note":"identity_provider","claim.name":"identity_provider","jsonType.label":"String","id.token.claim":"true","access.token.claim":"true","userinfo.token.claim":"true"}}
               EOF
