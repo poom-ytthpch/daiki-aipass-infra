@@ -63,7 +63,7 @@ spec:
 ---
 apiVersion: batch/v1
 kind: Job
-metadata: {name: keycloak-bootstrap-v7, namespace: daiki-ai-passport}
+metadata: {name: keycloak-bootstrap-v8, namespace: daiki-ai-passport}
 spec:
   backoffLimit: 12
   template:
