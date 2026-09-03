@@ -63,7 +63,7 @@ spec:
 ---
 apiVersion: batch/v1
 kind: Job
-metadata: {name: keycloak-bootstrap-v5, namespace: daiki-ai-passport}
+metadata: {name: keycloak-bootstrap-v6, namespace: daiki-ai-passport}
 spec:
   backoffLimit: 12
   template:
@@ -78,6 +78,7 @@ spec:
             - {name: KC_BOOTSTRAP_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: keycloak-bootstrap-password}}}
             - {name: DAIKI_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: initial-admin-password}}}
             - {name: ADMIN_EMAIL, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: admin-email}}}
+            - {name: GMAIL_APP_PASSWORD, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: gmail-app-password, optional: true}}}
             - {name: GOOGLE_CLIENT_ID, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: google-client-id, optional: true}}}
             - {name: GOOGLE_CLIENT_SECRET, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: google-client-secret, optional: true}}}
           command: ["/bin/bash","-ec"]
@@ -89,6 +90,19 @@ spec:
                 $K update realms/daiki -s enabled=true -s registrationAllowed=true -s registrationEmailAsUsername=true -s loginWithEmailAllowed=true -s duplicateEmailsAllowed=false -s resetPasswordAllowed=true -s rememberMe=true -s verifyEmail=false
               else
                 $K create realms -s realm=daiki -s enabled=true -s registrationAllowed=true -s registrationEmailAsUsername=true -s loginWithEmailAllowed=true -s duplicateEmailsAllowed=false -s resetPasswordAllowed=true -s rememberMe=true -s verifyEmail=false
+              fi
+              if [ -n "${ADMIN_EMAIL:-}" ] && [ -n "${GMAIL_APP_PASSWORD:-}" ]; then
+                cat >/tmp/realm-smtp.json <<EOF
+              {"smtpServer":{"host":"smtp.gmail.com","port":"587","from":"$ADMIN_EMAIL","fromDisplayName":"Daiki AI Passport","replyTo":"$ADMIN_EMAIL","replyToDisplayName":"Daiki AI Passport","auth":"true","starttls":"true","ssl":"false","user":"$ADMIN_EMAIL","password":"$GMAIL_APP_PASSWORD"}}
+              EOF
+                if $K update realms/daiki -f /tmp/realm-smtp.json; then
+                  echo gmail-smtp-configured
+                else
+                  echo gmail-smtp-config-failed
+                  exit 1
+                fi
+              else
+                echo gmail-smtp-not-configured
               fi
               $K get roles/ai-user -r daiki >/dev/null 2>&1 || $K create roles -r daiki -s name=ai-user -s description='Daiki AI user'
               $K get roles/ai-admin -r daiki >/dev/null 2>&1 || $K create roles -r daiki -s name=ai-admin -s description='Daiki AI administrator'
