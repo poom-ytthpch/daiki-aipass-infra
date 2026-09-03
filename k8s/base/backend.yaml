@@ -11,6 +11,9 @@ spec:
     metadata:
       labels: {app: backend}
     spec:
+      securityContext:
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: backend
           image: ghcr.io/poom-ytthpch/daiki-ai-passport-backend:sha-cd445c7
