@@ -63,7 +63,7 @@ spec:
 ---
 apiVersion: batch/v1
 kind: Job
-metadata: {name: keycloak-bootstrap-v13, namespace: daiki-ai-passport}
+metadata: {name: keycloak-bootstrap-v14, namespace: daiki-ai-passport}
 spec:
   backoffLimit: 12
   template:
@@ -124,7 +124,7 @@ spec:
                     echo "missing-google-auto-link-execution-$PROVIDER" >&2
                     exit 1
                   fi
-                  $K update authentication/flows/$GOOGLE_LINK_FLOW/executions -r daiki -s id="$EXEC_ID" -s requirement=ALTERNATIVE >/dev/null
+                  $K update authentication/flows/$GOOGLE_LINK_FLOW/executions -r daiki -n -s id="$EXEC_ID" -s requirement=ALTERNATIVE >/dev/null
                 done
                 cat >/tmp/google-idp.json <<EOF
               {"alias":"google","displayName":"Google","providerId":"google","enabled":true,"trustEmail":true,"storeToken":false,"linkOnly":false,"firstBrokerLoginFlowAlias":"$GOOGLE_LINK_FLOW","config":{"clientId":"$GOOGLE_CLIENT_ID","clientSecret":"$GOOGLE_CLIENT_SECRET","defaultScope":"openid profile email","syncMode":"IMPORT"}}
