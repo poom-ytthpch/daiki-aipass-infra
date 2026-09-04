@@ -3,6 +3,10 @@ kind: Deployment
 metadata: {name: keycloak, namespace: daiki-ai-passport}
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  minReadySeconds: 10
   selector: {matchLabels: {app: keycloak}}
   template:
     metadata: {labels: {app: keycloak}}
@@ -24,9 +28,9 @@ spec:
             - {name: KC_HOSTNAME, value: "https://api.matchchemical.co"}
             - {name: KC_PROXY_HEADERS, value: xforwarded}
             - {name: KC_METRICS_ENABLED, value: "true"}
-          startupProbe: {httpGet: {path: /health/started, port: management}, periodSeconds: 5, failureThreshold: 60}
-          readinessProbe: {httpGet: {path: /health/ready, port: management}, periodSeconds: 10, failureThreshold: 12}
-          livenessProbe: {httpGet: {path: /health/live, port: management}, periodSeconds: 20, failureThreshold: 6}
+          startupProbe: {httpGet: {path: /health/started, port: management}, timeoutSeconds: 5, periodSeconds: 5, failureThreshold: 120}
+          readinessProbe: {httpGet: {path: /health/ready, port: management}, timeoutSeconds: 5, periodSeconds: 10, failureThreshold: 18}
+          livenessProbe: {httpGet: {path: /health/live, port: management}, timeoutSeconds: 5, periodSeconds: 20, failureThreshold: 12}
           resources:
             requests: {cpu: 150m, memory: 512Mi}
             limits: {cpu: "1", memory: 1400Mi}
