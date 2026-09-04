@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/poom-ytthpch/daiki-ai-passport-frontend:sha-9840d3b
+          image: ghcr.io/poom-ytthpch/daiki-ai-passport-frontend:sha-1c7aee9
           ports:
             - {name: http, containerPort: 3000}
           env:
