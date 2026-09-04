@@ -63,7 +63,7 @@ spec:
 ---
 apiVersion: batch/v1
 kind: Job
-metadata: {name: keycloak-bootstrap-v11, namespace: daiki-ai-passport}
+metadata: {name: keycloak-bootstrap-v12, namespace: daiki-ai-passport}
 spec:
   backoffLimit: 12
   template:
@@ -100,8 +100,24 @@ spec:
               fi
               echo identity-provider-mapper-managed-outside-bootstrap
               if [ -n "${GOOGLE_CLIENT_ID:-}" ] && [ -n "${GOOGLE_CLIENT_SECRET:-}" ]; then
+                GOOGLE_LINK_FLOW=google-auto-link
+                GOOGLE_LINK_FLOW_ID="$($K get authentication/flows -r daiki --fields id,alias --format csv --noquotes | awk -F, -v want="$GOOGLE_LINK_FLOW" '$2==want {print $1; exit}')"
+                if [ -z "$GOOGLE_LINK_FLOW_ID" ]; then
+                  $K create authentication/flows -r daiki -s alias="$GOOGLE_LINK_FLOW" -s providerId=basic-flow -s topLevel=true -s builtIn=false >/dev/null
+                  $K create authentication/flows/$GOOGLE_LINK_FLOW/executions/execution -r daiki -s provider=idp-create-user-if-unique >/dev/null
+                  $K create authentication/flows/$GOOGLE_LINK_FLOW/executions/execution -r daiki -s provider=idp-auto-link >/dev/null
+                fi
+                GOOGLE_LINK_EXECUTIONS="$($K get authentication/flows/$GOOGLE_LINK_FLOW/executions -r daiki --fields id,providerId,requirement --format csv --noquotes)"
+                for PROVIDER in idp-create-user-if-unique idp-auto-link; do
+                  EXEC_ID="$(printf '%s\n' "$GOOGLE_LINK_EXECUTIONS" | awk -F, -v want="$PROVIDER" '$2==want {print $1; exit}')"
+                  if [ -z "$EXEC_ID" ]; then
+                    echo "missing-google-auto-link-execution-$PROVIDER" >&2
+                    exit 1
+                  fi
+                  $K update authentication/flows/$GOOGLE_LINK_FLOW/executions -r daiki -s id="$EXEC_ID" -s requirement=ALTERNATIVE >/dev/null
+                done
                 cat >/tmp/google-idp.json <<EOF
-              {"alias":"google","displayName":"Google","providerId":"google","enabled":true,"trustEmail":true,"storeToken":false,"linkOnly":false,"firstBrokerLoginFlowAlias":"first broker login","config":{"clientId":"$GOOGLE_CLIENT_ID","clientSecret":"$GOOGLE_CLIENT_SECRET","defaultScope":"openid profile email","syncMode":"IMPORT"}}
+              {"alias":"google","displayName":"Google","providerId":"google","enabled":true,"trustEmail":true,"storeToken":false,"linkOnly":false,"firstBrokerLoginFlowAlias":"$GOOGLE_LINK_FLOW","config":{"clientId":"$GOOGLE_CLIENT_ID","clientSecret":"$GOOGLE_CLIENT_SECRET","defaultScope":"openid profile email","syncMode":"IMPORT"}}
               EOF
                 if $K get identity-provider/instances/google -r daiki >/dev/null 2>&1; then
                   $K update identity-provider/instances/google -r daiki -f /tmp/google-idp.json
