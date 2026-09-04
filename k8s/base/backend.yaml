@@ -16,7 +16,7 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: backend
-          image: ghcr.io/poom-ytthpch/daiki-ai-passport-backend:sha-f2005f2
+          image: ghcr.io/poom-ytthpch/daiki-ai-passport-backend:sha-389d3f1
           ports:
             - {name: http, containerPort: 8080}
           env:
