@@ -189,16 +189,19 @@ spec:
               install -m 0600 -o 10000 -g 10000 /bootstrap/config.yaml /data/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/guest-config.yaml /data/profiles/guest/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/guest-media-config.yaml /data/profiles/guest-media/config.yaml
-              printf 'LITELLM_MASTER_KEY=%s\n' "$LITELLM_MASTER_KEY" > /data/profiles/guest/.env
-              printf 'LITELLM_MASTER_KEY=%s\n' "$LITELLM_MASTER_KEY" > /data/profiles/guest-media/.env
-              chown 10000:10000 /data/profiles/guest/.env /data/profiles/guest-media/.env
-              chmod 0600 /data/profiles/guest/.env /data/profiles/guest-media/.env
+              umask 077
+              printf 'LITELLM_MASTER_KEY=%s\n' "$LITELLM_MASTER_KEY" > /runtime-secrets/litellm.env
+              chown 10000:10000 /runtime-secrets/litellm.env
+              ln -sfn /runtime-secrets/litellm.env /data/.env
+              ln -sfn /runtime-secrets/litellm.env /data/profiles/guest/.env
+              ln -sfn /runtime-secrets/litellm.env /data/profiles/guest-media/.env
               touch /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
               chown 10000:10000 /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
           env:
             - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
           volumeMounts:
             - {name: data, mountPath: /data}
+            - {name: runtime-secrets, mountPath: /runtime-secrets}
             - {name: config, mountPath: /bootstrap/config.yaml, subPath: config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/guest-config.yaml, subPath: guest-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/guest-media-config.yaml, subPath: guest-media-config.yaml, readOnly: true}
@@ -237,9 +240,12 @@ spec:
             limits: {cpu: "1", memory: 1536Mi}
           volumeMounts:
             - {name: data, mountPath: /opt/data}
+            - {name: runtime-secrets, mountPath: /runtime-secrets, readOnly: true}
       volumes:
         - name: data
           persistentVolumeClaim: {claimName: hermes-data}
+        - name: runtime-secrets
+          emptyDir: {medium: Memory}
         - name: config
           configMap: {name: hermes-config}
 ---
