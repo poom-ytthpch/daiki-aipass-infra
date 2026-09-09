@@ -1,0 +1,121 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hermes-config
+  namespace: daiki-ai-passport
+data:
+  config.yaml: |
+    model:
+      default: qwen-local
+      provider: custom
+      base_url: http://litellm:4000/v1
+      api_key: ${LITELLM_MASTER_KEY}
+    gateway:
+      api_server:
+        max_concurrent_runs: 4
+      platforms:
+        api_server:
+          direct_model_requests: true
+    # API-server users start with a deliberately narrow agent surface. Daiki
+    # continues to own files/history/quota; Hermes may reason, clarify and use
+    # web/search, but gets no shell/filesystem/browser/automation privileges.
+    platform_toolsets:
+      api_server:
+        - web
+        - search
+        - clarify
+    agent:
+      disabled_toolsets:
+        - terminal
+        - file
+        - browser
+        - code_execution
+        - cronjob
+        - memory
+        - messaging
+        - homeassistant
+        - spotify
+        - discord
+        - discord_admin
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hermes-data
+  namespace: daiki-ai-passport
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests: {storage: 2Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hermes
+  namespace: daiki-ai-passport
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: hermes}
+  template:
+    metadata:
+      labels: {app: hermes}
+    spec:
+      initContainers:
+        - name: bootstrap-config
+          image: busybox:1.37.0
+          command: ["sh","-ec","cp /bootstrap/config.yaml /data/config.yaml && chmod 0600 /data/config.yaml"]
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: config, mountPath: /bootstrap/config.yaml, subPath: config.yaml, readOnly: true}
+      containers:
+        - name: hermes
+          image: nousresearch/hermes-agent:v2026.9.7
+          args: ["gateway","run"]
+          ports:
+            - {name: http, containerPort: 8642}
+          env:
+            - {name: HERMES_UID, value: "10000"}
+            - {name: HERMES_GID, value: "10000"}
+            - {name: API_SERVER_ENABLED, value: "true"}
+            - {name: API_SERVER_HOST, value: "0.0.0.0"}
+            - {name: API_SERVER_PORT, value: "8642"}
+            - {name: API_SERVER_MODEL_NAME, value: "daiki-hermes"}
+            - {name: API_SERVER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: hermes-api-key}}}
+            - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 5
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 1536Mi}
+          volumeMounts:
+            - {name: data, mountPath: /opt/data}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: hermes-data}
+        - name: config
+          configMap: {name: hermes-config}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hermes
+  namespace: daiki-ai-passport
+spec:
+  selector: {app: hermes}
+  ports:
+    - {name: http, port: 8642, targetPort: http}

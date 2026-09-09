@@ -5,6 +5,8 @@ metadata:
   namespace: daiki-ai-passport
 data:
   local-llm-base-url: "http://10.90.0.11:8000/v1"
+  hermes-enabled: "true"
+  hermes-fallback-to-litellm: "true"
   model-fast: "test-nvidia-nemotron-3-nano-4b"
   model-balanced: "test-nvidia-nemotron-3-nano-4b"
   model-deep: "test-nvidia-nemotron-3-nano-4b"

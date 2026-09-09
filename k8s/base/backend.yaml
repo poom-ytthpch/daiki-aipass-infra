@@ -35,6 +35,10 @@ spec:
             - {name: TOKEN_ENCRYPTION_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: token-encryption-key}}}
             - {name: APP_BASE_URL, value: "https://daiki-aipass.matchchemical.co"}
             - {name: LITELLM_BASE_URL, value: "http://litellm:4000"}
+            - {name: HERMES_ENABLED, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: hermes-enabled}}}
+            - {name: HERMES_BASE_URL, value: "http://hermes:8642"}
+            - {name: HERMES_API_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: hermes-api-key}}}
+            - {name: HERMES_FALLBACK_TO_LITELLM, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: hermes-fallback-to-litellm}}}
             - {name: SEARXNG_BASE_URL, value: "http://searxng:8080"}
             - {name: WEB_RESEARCH_MAX_RESULTS, value: "5"}
             - {name: WEB_RESEARCH_FETCH_PAGES, value: "3"}
