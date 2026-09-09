@@ -5,11 +5,22 @@ metadata:
   namespace: daiki-ai-passport
 data:
   config.yaml: |
+    _config_version: 41
     model:
-      default: qwen-local
+      default: groq-qwen-qwen3.8-27b
       provider: custom
       base_url: http://litellm:4000/v1
       api_key: ${LITELLM_MASTER_KEY}
+    auxiliary:
+      # Daiki owns persisted session titles. Avoid an extra auxiliary request on
+      # every API chat and keep all remaining auto auxiliary work on the main
+      # LiteLLM-backed model.
+      title_generation:
+        enabled: false
+        provider: main
+      compression:
+        provider: main
+        max_concurrency: 2
     gateway:
       api_server:
         max_concurrent_runs: 4
@@ -24,6 +35,14 @@ data:
         - web
         - search
         - clarify
+    terminal:
+      # Terminal/code tools are denied below; keep the configured execution backend
+      # fail-closed as an additional boundary if a future toolset regression occurs.
+      backend: docker
+      docker_network: false
+      docker_mount_cwd_to_workspace: false
+    tool_loop_guardrails:
+      non_interactive_hard_stop_enabled: true
     agent:
       disabled_toolsets:
         - terminal
@@ -62,10 +81,11 @@ spec:
     metadata:
       labels: {app: hermes}
     spec:
+      automountServiceAccountToken: false
       initContainers:
         - name: bootstrap-config
           image: busybox:1.37.0
-          command: ["sh","-ec","cp /bootstrap/config.yaml /data/config.yaml && chmod 0600 /data/config.yaml"]
+          command: ["sh","-ec","cp /bootstrap/config.yaml /data/config.yaml && chown 10000:10000 /data/config.yaml && chmod 0600 /data/config.yaml"]
           volumeMounts:
             - {name: data, mountPath: /data}
             - {name: config, mountPath: /bootstrap/config.yaml, subPath: config.yaml, readOnly: true}
