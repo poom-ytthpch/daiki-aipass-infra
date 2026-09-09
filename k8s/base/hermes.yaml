@@ -12,9 +12,6 @@ data:
       base_url: http://litellm:4000/v1
       api_key: ${LITELLM_MASTER_KEY}
     auxiliary:
-      # Daiki owns persisted session titles. Avoid an extra auxiliary request on
-      # every API chat and keep all remaining auto auxiliary work on the main
-      # LiteLLM-backed model.
       title_generation:
         enabled: false
         provider: main
@@ -22,22 +19,32 @@ data:
         provider: main
         max_concurrency: 2
     gateway:
+      multiplex_profiles: true
+      multiplex_profile_allowlist:
+        - guest
+        - guest-media
       api_server:
         max_concurrent_runs: 4
       platforms:
         api_server:
           direct_model_requests: true
-    # API-server users start with a deliberately narrow agent surface. Daiki
-    # continues to own files/history/quota; Hermes may reason, clarify and use
-    # web/search, but gets no shell/filesystem/browser/automation privileges.
+    # Logged-in Daiki users get Hermes' safe agent surface and skill learning.
+    # Host shell/filesystem/code execution stay disabled until a real isolated
+    # execution backend is available.
     platform_toolsets:
       api_server:
         - web
-        - search
+        - browser
+        - vision
+        - image_gen
+        - skills
+        - todo
+        - delegation
+        - session_search
         - clarify
+    skills:
+      write_approval: false
     terminal:
-      # Terminal/code tools are denied below; keep the configured execution backend
-      # fail-closed as an additional boundary if a future toolset regression occurs.
       backend: docker
       docker_network: false
       docker_mount_cwd_to_workspace: false
@@ -47,10 +54,99 @@ data:
       disabled_toolsets:
         - terminal
         - file
-        - browser
         - code_execution
         - cronjob
         - memory
+        - messaging
+        - homeassistant
+        - spotify
+        - discord
+        - discord_admin
+  guest-config.yaml: |
+    _config_version: 41
+    model:
+      default: groq-openai-gpt-oss-20b
+      provider: custom
+      base_url: http://litellm:4000/v1
+      api_key: ${LITELLM_MASTER_KEY}
+    auxiliary:
+      title_generation:
+        enabled: false
+        provider: main
+      compression:
+        provider: main
+    platform_toolsets:
+      api_server: []
+    terminal:
+      backend: docker
+      docker_network: false
+      docker_mount_cwd_to_workspace: false
+    agent:
+      disabled_toolsets:
+        - web
+        - browser
+        - terminal
+        - file
+        - code_execution
+        - vision
+        - image_gen
+        - video
+        - video_gen
+        - x_search
+        - skills
+        - todo
+        - memory
+        - context_engine
+        - session_search
+        - delegation
+        - cronjob
+        - computer_use
+        - messaging
+        - homeassistant
+        - spotify
+        - discord
+        - discord_admin
+  guest-media-config.yaml: |
+    _config_version: 41
+    model:
+      default: groq-openai-gpt-oss-20b
+      provider: custom
+      base_url: http://litellm:4000/v1
+      api_key: ${LITELLM_MASTER_KEY}
+    auxiliary:
+      title_generation:
+        enabled: false
+        provider: main
+      compression:
+        provider: main
+    # This profile is callable only by Daiki's dedicated, quota-checked image
+    # generation endpoint. It exposes image_gen and nothing else.
+    platform_toolsets:
+      api_server:
+        - image_gen
+    terminal:
+      backend: docker
+      docker_network: false
+      docker_mount_cwd_to_workspace: false
+    agent:
+      disabled_toolsets:
+        - web
+        - browser
+        - terminal
+        - file
+        - code_execution
+        - vision
+        - video
+        - video_gen
+        - x_search
+        - skills
+        - todo
+        - memory
+        - context_engine
+        - session_search
+        - delegation
+        - cronjob
+        - computer_use
         - messaging
         - homeassistant
         - spotify
@@ -85,10 +181,27 @@ spec:
       initContainers:
         - name: bootstrap-config
           image: busybox:1.37.0
-          command: ["sh","-ec","cp /bootstrap/config.yaml /data/config.yaml && chown 10000:10000 /data/config.yaml && chmod 0600 /data/config.yaml"]
+          command:
+            - sh
+            - -ec
+            - |
+              install -d -m 0750 -o 10000 -g 10000 /data/profiles/guest /data/profiles/guest-media
+              install -m 0600 -o 10000 -g 10000 /bootstrap/config.yaml /data/config.yaml
+              install -m 0600 -o 10000 -g 10000 /bootstrap/guest-config.yaml /data/profiles/guest/config.yaml
+              install -m 0600 -o 10000 -g 10000 /bootstrap/guest-media-config.yaml /data/profiles/guest-media/config.yaml
+              printf 'LITELLM_MASTER_KEY=%s\n' "$LITELLM_MASTER_KEY" > /data/profiles/guest/.env
+              printf 'LITELLM_MASTER_KEY=%s\n' "$LITELLM_MASTER_KEY" > /data/profiles/guest-media/.env
+              chown 10000:10000 /data/profiles/guest/.env /data/profiles/guest-media/.env
+              chmod 0600 /data/profiles/guest/.env /data/profiles/guest-media/.env
+              touch /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
+              chown 10000:10000 /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
+          env:
+            - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
           volumeMounts:
             - {name: data, mountPath: /data}
             - {name: config, mountPath: /bootstrap/config.yaml, subPath: config.yaml, readOnly: true}
+            - {name: config, mountPath: /bootstrap/guest-config.yaml, subPath: guest-config.yaml, readOnly: true}
+            - {name: config, mountPath: /bootstrap/guest-media-config.yaml, subPath: guest-media-config.yaml, readOnly: true}
       containers:
         - name: hermes
           image: nousresearch/hermes-agent:v2026.9.7
