@@ -312,6 +312,10 @@ spec:
               # Provider-side tool validation happens before clarify_tool() can normalize.
               # Accept a bounded oversized model call here; _clean_choices() still caps UI choices to 4.
               src = src.replace(needle, '"maxItems": 16,', 1)
+              nullable_needle = '"choices": {\n                            "type": "array",'
+              if nullable_needle not in src:
+                  raise SystemExit('clarify nullable choices patch target changed; refusing to start')
+              src = src.replace(nullable_needle, '"choices": {\n                            "type": ["array", "null"],', 1)
               Path('/tool-overrides/clarify_tool.py').write_text(src)
               PY
               chmod 0444 /tool-overrides/clarify_tool.py
