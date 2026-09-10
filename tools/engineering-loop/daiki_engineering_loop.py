@@ -19,6 +19,7 @@ import json
 import os
 import pathlib
 import random
+import re
 import socket
 import statistics
 import subprocess
@@ -310,7 +311,7 @@ def run_hermes_suite(context:str,namespace:str,report:Report)->None:
     }
     for profile,budget in budgets.items():
         home=f"/opt/data/profiles/{profile}"
-        script=f'HERMES_HOME={home} /opt/hermes/.venv/bin/hermes prompt-size --platform api_server --json 2>/dev/null'
+        script=f'HERMES_SESSION_PLATFORM=api_server HERMES_HOME={home} /opt/hermes/.venv/bin/hermes prompt-size --platform api_server --json 2>/dev/null'
         code,out,ms=kubectl_exec(context,namespace,pod,script,90)
         try:
             d=json.loads(out[out.find("{"):])
@@ -322,7 +323,7 @@ def run_hermes_suite(context:str,namespace:str,report:Report)->None:
         report.add(Result(f"prompt-size-{profile}","hermes",PASS if ok else FAIL,ms,None,detail,metrics))
     script='printf "files="; find /opt/data/profiles/skills/skills -name SKILL.md | wc -l; printf "journey="; HERMES_HOME=/opt/data/profiles/skills /opt/hermes/.venv/bin/hermes journey --json 2>/dev/null | /opt/hermes/.venv/bin/python -c "import json,sys; d=json.load(sys.stdin); print(len(d.get(\"nodes\",[])))"'
     code,out,ms=kubectl_exec(context,namespace,pod,script,90)
-    m=re.search(r"files=(\d+).*journey=(\d+)",out,re.S)
+    m=re.search(r"files=\s*(\d+).*journey=\s*(\d+)",out,re.S)
     metrics={"skillFiles":int(m.group(1)) if m else 0,"journeyNodes":int(m.group(2)) if m else 0}
     report.add(Result("skill-inventory","learning",PASS if code==0 and metrics["skillFiles"]>=50 else FAIL,ms,None,f"files={metrics['skillFiles']} journey={metrics['journeyNodes']}",metrics))
     cases=[

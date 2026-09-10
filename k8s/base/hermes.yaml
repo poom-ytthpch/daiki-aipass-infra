@@ -121,6 +121,14 @@ data:
       non_interactive_hard_stop_enabled: true
     agent:
       api_max_retries: 1
+      task_completion_guidance: false
+      parallel_tool_call_guidance: false
+      environment_probe: false
+      coding_context: "off"
+      verify_guidance: false
+      tool_use_enforcement: false
+      execution_guidance: false
+      intent_ack_continuation: false
       image_input_mode: native
       disabled_toolsets:
         - web
@@ -253,6 +261,14 @@ data:
       docker_mount_cwd_to_workspace: false
     agent:
       api_max_retries: 1
+      task_completion_guidance: false
+      parallel_tool_call_guidance: false
+      environment_probe: false
+      coding_context: "off"
+      verify_guidance: false
+      tool_use_enforcement: false
+      execution_guidance: false
+      intent_ack_continuation: false
       disabled_toolsets:
         - web
         - browser
@@ -307,6 +323,14 @@ data:
       non_interactive_hard_stop_enabled: true
     agent:
       api_max_retries: 1
+      task_completion_guidance: false
+      parallel_tool_call_guidance: false
+      environment_probe: false
+      coding_context: "off"
+      verify_guidance: false
+      tool_use_enforcement: false
+      execution_guidance: false
+      intent_ack_continuation: false
       disabled_toolsets:
         - web
         - browser
