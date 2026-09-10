@@ -847,6 +847,9 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+    # Hermes is an internal-only control/runtime endpoint. Even if a public
+    # router forwards 443 to ingress-nginx, reject non-LAN/VPN source ranges.
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,100.64.0.0/10"
 spec:
   ingressClassName: nginx
   tls:
