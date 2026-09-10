@@ -631,8 +631,18 @@ spec:
                   raise SystemExit('clarify nullable choices patch target changed; refusing to start')
               src = src.replace(nullable_needle, '"choices": {\n                            "type": ["array", "null"],', 1)
               Path('/tool-overrides/clarify_tool.py').write_text(src)
+
+              api_path = Path('/opt/hermes/gateway/platforms/api_server.py')
+              api_src = api_path.read_text()
+              reasoning_needle = "        if request_reasoning_config is None:\n            request_reasoning_config = GatewayRunner._load_reasoning_config(model)\n        agent_kwargs = {"
+              if api_src.count(reasoning_needle) != 1:
+                  raise SystemExit('Hermes API reasoning patch target changed; refusing to start')
+              reasoning_patch = "        if request_reasoning_config is None:\n            request_reasoning_config = GatewayRunner._load_reasoning_config(model)\n        # Daiki sends per-turn reasoning through model_options. Custom OpenAI-compatible\n        # gateways (LiteLLM -> Groq) otherwise keep the agent reasoning_config but drop\n        # the provider wire field. Preserve it as a top-level request override and keep\n        # private reasoning hidden from the response body.\n        request_overrides = dict(runtime_kwargs.get(\"request_overrides\") or {})\n        if isinstance(request_reasoning_config, dict):\n            enabled = request_reasoning_config.get(\"enabled\")\n            effort = str(request_reasoning_config.get(\"effort\") or \"\").strip().lower()\n            if enabled is False:\n                effort = \"none\"\n            if effort:\n                request_overrides[\"reasoning_effort\"] = effort\n                request_overrides[\"reasoning_format\"] = \"hidden\"\n        if request_overrides:\n            runtime_kwargs[\"request_overrides\"] = request_overrides\n        agent_kwargs = {"
+              api_src = api_src.replace(reasoning_needle, reasoning_patch, 1)
+              Path('/tool-overrides/api_server.py').write_text(api_src)
               PY
-              chmod 0444 /tool-overrides/clarify_tool.py
+              python -m py_compile /tool-overrides/clarify_tool.py /tool-overrides/api_server.py
+              chmod 0444 /tool-overrides/clarify_tool.py /tool-overrides/api_server.py
           volumeMounts:
             - {name: tool-overrides, mountPath: /tool-overrides}
         - name: bootstrap-config
@@ -725,6 +735,7 @@ spec:
             - {name: data, mountPath: /opt/data}
             - {name: runtime-secrets, mountPath: /runtime-secrets, readOnly: true}
             - {name: tool-overrides, mountPath: /opt/hermes/tools/clarify_tool.py, subPath: clarify_tool.py, readOnly: true}
+            - {name: tool-overrides, mountPath: /opt/hermes/gateway/platforms/api_server.py, subPath: api_server.py, readOnly: true}
       volumes:
         - name: data
           persistentVolumeClaim: {claimName: hermes-data}
