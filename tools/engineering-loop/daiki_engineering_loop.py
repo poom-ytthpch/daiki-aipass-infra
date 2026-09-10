@@ -327,6 +327,25 @@ def run_hermes_suite(context:str,namespace:str,report:Report)->None:
         except Exception as e:
             metrics={}; ok=False; detail=f"parse failed: {e}; {out[-200:]}"
         report.add(Result(f"prompt-size-{profile}","hermes",PASS if ok else FAIL,ms,None,detail,metrics))
+    vision_script = """HERMES_HOME=/opt/data/profiles/vision /opt/hermes/.venv/bin/python - <<'PYV'
+from agent.vision_message_prep import VisionMessagePrepMixin
+from agent.image_routing import decide_image_input_mode
+from hermes_cli.config import load_config
+class Probe(VisionMessagePrepMixin):
+    provider = "custom"
+    model = "groq-qwen-qwen3.8-27b"
+    _anthropic_image_fallback_cache = {}
+p = Probe()
+msg = [{"role":"user","content":[{"type":"text","text":"review"},{"type":"image_url","image_url":{"url":"data:image/png;base64,iVBORw0KGgo="}}]}]
+cfg = load_config()
+out = p._prepare_messages_for_non_vision_model(msg)
+print("supportsVision=", p._model_supports_vision())
+print("mode=", decide_image_input_mode(p.provider,p.model,cfg))
+print("unchanged=", out == msg)
+PYV"""
+    code,out,ms=kubectl_exec(context,namespace,pod,vision_script,90)
+    vision_ok=code==0 and "supportsVision= True" in out and "mode= native" in out and "unchanged= True" in out
+    report.add(Result("native-vision-routing","hermes",PASS if vision_ok else FAIL,ms,None,out[-240:].replace("\n"," "),{}))
     script='printf "files="; find /opt/data/profiles/skills/skills -name SKILL.md | wc -l; printf "journey="; HERMES_HOME=/opt/data/profiles/skills /opt/hermes/.venv/bin/hermes journey --json 2>/dev/null | /opt/hermes/.venv/bin/python -c "import json,sys; d=json.load(sys.stdin); print(len(d.get(\"nodes\",[])))"'
     code,out,ms=kubectl_exec(context,namespace,pod,script,90)
     m=re.search(r"files=\s*(\d+).*journey=\s*(\d+)",out,re.S)
