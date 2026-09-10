@@ -32,6 +32,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+import zipfile
 from typing import Any, Callable, Iterable
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -39,11 +40,55 @@ VISION_FIXTURE = ROOT / "fixtures" / "vision-marker.png"
 DOC_FIXTURE = ROOT / "fixtures" / "document-marker.txt"
 VISION_MARKER = "DAIKI-VISION-4827"
 DOC_MARKER = "DOCUMENT-ALPHA-7319"
+PDF_MARKER = "PDF-ALPHA-8421"
+XLSX_MARKER = "XLSX-OMEGA-5521"
+CSV_SKU = "CSV-TARGET-7319"
+CSV_STATUS = "CANCELLED-7319"
 
 PASS = "PASS"
 FAIL = "FAIL"
 BLOCKED = "BLOCKED"
 SKIP = "SKIP"
+
+def build_pdf_fixture(path:pathlib.Path, marker:str=PDF_MARKER) -> None:
+    stream=f"BT /F1 18 Tf 72 720 Td ({marker}) Tj ET".encode("ascii")
+    objects=[
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+        b"<< /Length "+str(len(stream)).encode()+b" >>\nstream\n"+stream+b"\nendstream",
+    ]
+    out=bytearray(b"%PDF-1.4\n")
+    offsets=[0]
+    for idx,obj in enumerate(objects,1):
+        offsets.append(len(out)); out.extend(f"{idx} 0 obj\n".encode()); out.extend(obj); out.extend(b"\nendobj\n")
+    xref=len(out); out.extend(f"xref\n0 {len(objects)+1}\n".encode()); out.extend(b"0000000000 65535 f \n")
+    for off in offsets[1:]: out.extend(f"{off:010d} 00000 n \n".encode())
+    out.extend(f"trailer\n<< /Size {len(objects)+1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode())
+    path.write_bytes(out)
+
+def build_xlsx_fixture(path:pathlib.Path, marker:str=XLSX_MARKER) -> None:
+    content_types='''<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>'''
+    rels='''<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'''
+    workbook='''<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Data" sheetId="1" r:id="rId1"/></sheets></workbook>'''
+    wb_rels='''<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>'''
+    sheet=f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>key</t></is></c><c r="B1" t="inlineStr"><is><t>value</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>verification</t></is></c><c r="B2" t="inlineStr"><is><t>{marker}</t></is></c></row></sheetData></worksheet>'''
+    with zipfile.ZipFile(path,"w",zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml",content_types)
+        z.writestr("_rels/.rels",rels)
+        z.writestr("xl/workbook.xml",workbook)
+        z.writestr("xl/_rels/workbook.xml.rels",wb_rels)
+        z.writestr("xl/worksheets/sheet1.xml",sheet)
+
+def build_large_csv_fixture(path:pathlib.Path) -> None:
+    with path.open("w",encoding="utf-8",newline="") as f:
+        f.write("sku,price,status,note\n")
+        for i in range(24000):
+            if i==19000:
+                f.write(f"{CSV_SKU},99,{CSV_STATUS},deep-target\n")
+            else:
+                f.write(f"SKU-{i:05d},{i%97},OK,row-{i}\n")
 
 @dataclasses.dataclass
 class Result:
@@ -118,7 +163,7 @@ class API:
 
     def multipart(self,path:str,file_path:pathlib.Path,headers:dict[str,str],source:str="file") -> HTTPResult:
         boundary="----daiki-loop-"+uuid.uuid4().hex
-        blob=file_path.read_bytes(); mime="image/png" if file_path.suffix.lower()==".png" else "text/plain"
+        blob=file_path.read_bytes(); ext=file_path.suffix.lower(); mime={".png":"image/png",".jpg":"image/jpeg",".jpeg":"image/jpeg",".webp":"image/webp",".pdf":"application/pdf",".xlsx":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",".xlsm":"application/vnd.ms-excel.sheet.macroEnabled.12",".csv":"text/csv",".tsv":"text/tab-separated-values"}.get(ext,"text/plain")
         parts=[]
         def field(name:str,value:str):
             parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n".encode())
@@ -178,7 +223,8 @@ def cleanup(api:API,attachment_id:str|None,headers:dict[str,str]) -> None:
     if not attachment_id: return
     with contextlib.suppress(Exception): api.request("DELETE",f"/guest/attachments/{urllib.parse.quote(attachment_id)}",headers=headers)
 
-def run_api_suite(api:API,report:Report,seed_base:int=1000) -> None:
+def run_api_suite(api:API,report:Report,seed_base:int|None=None) -> None:
+    if seed_base is None: seed_base=random.SystemRandom().randrange(1000,59000)
     add_http(report,"live","api",api.request("GET","/health/live"),lambda r:r.status==200)
     add_http(report,"ready","api",api.request("GET","/health/ready"),lambda r:r.status==200)
     policy=api.request("GET","/guest/policy"); p=json_obj(policy.body) or {}
@@ -223,6 +269,27 @@ def run_api_suite(api:API,report:Report,seed_base:int=1000) -> None:
         report.add(Result("file-download","file",PASS if down.status==200 and DOC_MARKER.encode() in down.body else FAIL,down.latency_ms,down.status,f"bytes={len(down.body)}",{}))
         cleanup(api,aid,h)
 
+    # Production document parsers: PDF, XLSX, and a large CSV target deep in the file.
+    with tempfile.TemporaryDirectory(prefix="daiki-doc-e2e-") as td:
+        td_path=pathlib.Path(td)
+        pdf_path=td_path/"marker.pdf"; xlsx_path=td_path/"marker.xlsx"; csv_path=td_path/"large.csv"
+        build_pdf_fixture(pdf_path); build_xlsx_fixture(xlsx_path); build_large_csv_fixture(csv_path)
+        doc_cases=[
+            ("pdf",pdf_path,"Return only the exact verification marker visible in the attached PDF.",PDF_MARKER,"pdf-ready"),
+            ("xlsx",xlsx_path,"Return only the exact value beside verification in the attached spreadsheet.",XLSX_MARKER,"xlsx-ready"),
+            ("large-csv",csv_path,f"For SKU {CSV_SKU}, return only the exact status value.",CSV_STATUS,"text-"),
+        ]
+        for offset,(name,file_path,prompt,expected,status_prefix) in enumerate(doc_cases,50):
+            dh=guest_headers(seed_base+offset,f"Loop {name}")
+            dup=api.multipart("/guest/attachments",file_path,dh,"file")
+            dd=json_obj(dup.body) or {}; daid=dd.get("id") if isinstance(dd,dict) else None; extract=str(dd.get("extractStatus",'')) if isinstance(dd,dict) else ""
+            upload_ok=dup.status==201 and bool(daid) and extract.startswith(status_prefix)
+            report.add(Result(f"{name}-upload","document",PASS if upload_ok else FAIL,dup.latency_ms,dup.status,f"id={daid} extract={extract} bytes={file_path.stat().st_size}",{}))
+            if daid:
+                dchat=api.request("POST","/guest/chat",headers=dh,json_body={"model":"fast","attachmentIds":[daid],"messages":[{"role":"user","content":prompt}],"stream":False})
+                dtxt=chat_text(dchat.body).strip()
+                report.add(Result(f"{name}-grounding","document",PASS if dchat.status==200 and expected in dtxt else FAIL,dchat.latency_ms,dchat.status,dtxt[:180],header_metrics(dchat.headers)))
+                cleanup(api,daid,dh)
     # Native image understanding. Marker exists only in pixels.
     h=guest_headers(seed_base+20,"Loop Vision")
     up=api.multipart("/guest/attachments",VISION_FIXTURE,h,"image"); ud=json_obj(up.body) or {}; aid=ud.get("id") if isinstance(ud,dict) else None
@@ -249,6 +316,8 @@ def run_api_suite(api:API,report:Report,seed_base:int=1000) -> None:
     idata=json_obj(ig.body) or {}; iatt=idata.get("attachment",{}) if isinstance(idata,dict) else {}; iaid=iatt.get("id") if isinstance(iatt,dict) else None
     if ig.status==201 and iaid:
         report.add(Result("image-generation","generation",PASS,ig.latency_ms,ig.status,str(iaid),{})); cleanup(api,iaid,h)
+    elif ig.status==429 and isinstance(idata,dict) and idata.get("error")=="guest_image_generation_limit":
+        report.add(Result("image-generation","generation",BLOCKED,ig.latency_ms,ig.status,"Guest daily image-generation policy limit reached for this test identity",{}))
     elif ig.status in (502,503) and isinstance(idata,dict) and idata.get("error")=="image_generation_unavailable":
         report.add(Result("image-generation","generation",BLOCKED,ig.latency_ms,ig.status,"No active image-generation provider credential",{}))
     else:
@@ -346,11 +415,18 @@ PYV"""
     code,out,ms=kubectl_exec(context,namespace,pod,vision_script,90)
     vision_ok=code==0 and "supportsVision= True" in out and "mode= native" in out and "unchanged= True" in out
     report.add(Result("native-vision-routing","hermes",PASS if vision_ok else FAIL,ms,None,out[-240:].replace("\n"," "),{}))
-    script='printf "files="; find /opt/data/profiles/skills/skills -name SKILL.md | wc -l; printf "custom="; for s in daiki-document-analysis daiki-image-analysis graft-code-intelligence; do find /opt/data/profiles/skills/skills -path "*/$s/SKILL.md" -print -quit; done | wc -l; printf "journey="; HERMES_HOME=/opt/data/profiles/skills /opt/hermes/.venv/bin/hermes journey --json 2>/dev/null | /opt/hermes/.venv/bin/python -c "import json,sys; d=json.load(sys.stdin); print(len(d.get(\"nodes\",[])))"'
-    code,out,ms=kubectl_exec(context,namespace,pod,script,90)
-    m=re.search(r"files=\s*(\d+).*custom=\s*(\d+).*journey=\s*(\d+)",out,re.S)
-    metrics={"skillFiles":int(m.group(1)) if m else 0,"customSkills":int(m.group(2)) if m else 0,"journeyNodes":int(m.group(3)) if m else 0}
-    report.add(Result("skill-inventory","learning",PASS if code==0 and metrics["skillFiles"]>=53 and metrics["customSkills"]==3 else FAIL,ms,None,f"files={metrics['skillFiles']} custom={metrics['customSkills']} journey={metrics['journeyNodes']}",metrics))
+    inventory_script='printf "files="; find /opt/data/profiles/skills/skills -name SKILL.md 2>/dev/null | wc -l; printf "custom="; for s in daiki-document-analysis daiki-image-analysis graft-code-intelligence; do find /opt/data/profiles/skills/skills -path "*/$s/SKILL.md" -print -quit 2>/dev/null; done | wc -l'
+    inv_code,inv_out,inv_ms=kubectl_exec(context,namespace,pod,inventory_script,90)
+    inv_match=re.search(r"files=\s*(\d+).*custom=\s*(\d+)",inv_out,re.S)
+    journey_script='HERMES_HOME=/opt/data/profiles/skills /opt/hermes/.venv/bin/hermes journey --json 2>/dev/null'
+    journey_code,journey_out,journey_ms=kubectl_exec(context,namespace,pod,journey_script,90)
+    journey_nodes=0
+    with contextlib.suppress(Exception):
+        raw=journey_out[journey_out.find("{"):]
+        journey_nodes=len(json.loads(raw).get("nodes",[]))
+    metrics={"skillFiles":int(inv_match.group(1)) if inv_match else 0,"customSkills":int(inv_match.group(2)) if inv_match else 0,"journeyNodes":journey_nodes}
+    inventory_ok=inv_code==0 and journey_code==0 and metrics["skillFiles"]>=53 and metrics["customSkills"]==3
+    report.add(Result("skill-inventory","learning",PASS if inventory_ok else FAIL,inv_ms+journey_ms,None,f"files={metrics['skillFiles']} custom={metrics['customSkills']} journey={metrics['journeyNodes']}",metrics))
     cases=[
         ("user","plain-intelligence","Reply exactly HERMES_USER_OK","HERMES_USER_OK",None),
         ("skills","skill-graft","Use skill_view to inspect the installed skill named graft-code-intelligence, then answer with GRAFT_SKILL_OK followed by one token-saving principle from that skill.","GRAFT_SKILL_OK","skills"),
