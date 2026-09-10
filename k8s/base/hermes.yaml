@@ -76,6 +76,10 @@ data:
         provider: main
       compression:
         provider: main
+    gateway:
+      platforms:
+        api_server:
+          enabled: false
     platform_toolsets:
       api_server: []
     terminal:
@@ -121,6 +125,10 @@ data:
         provider: main
       compression:
         provider: main
+    gateway:
+      platforms:
+        api_server:
+          enabled: false
     # This profile is callable only by Daiki's dedicated, quota-checked image
     # generation endpoint. It exposes image_gen and nothing else.
     platform_toolsets:
