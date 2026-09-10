@@ -10,7 +10,7 @@ data:
   model-fast: "test-nvidia-nemotron-3-nano-4b"
   model-balanced: "test-nvidia-nemotron-3-nano-4b"
   model-deep: "test-nvidia-nemotron-3-nano-4b"
-  model-vision: "disabled"
+  model-vision: "groq-qwen-qwen3.8-27b"
   inference-global-concurrency: "4"
   inference-fast-concurrency: "4"
   inference-deep-concurrency: "1"
