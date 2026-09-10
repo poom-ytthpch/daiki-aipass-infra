@@ -5,3 +5,10 @@
 *.local.yaml
 secret.yaml
 secrets.yaml
+
+# Local Daiki Engineering Loop reports
+tools/engineering-loop/reports/
+
+# Python bytecode
+__pycache__/
+*.py[cod]

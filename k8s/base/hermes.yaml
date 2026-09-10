@@ -31,6 +31,8 @@ data:
       multiplex_profiles: true
       multiplex_profile_allowlist:
         - user
+        - skills
+        - agent
         - research
         - guest
         - guest-media
@@ -103,12 +105,11 @@ data:
       platforms:
         api_server:
           enabled: false
+    # Normal chat stays intentionally lean. Daiki routes skill-learning and
+    # delegation intents to dedicated profiles so every turn does not pay the
+    # token cost of heavy tool schemas.
     platform_toolsets:
       api_server:
-        - skills
-        - todo
-        - delegation
-        - session_search
         - clarify
     skills:
       write_approval: false
@@ -134,6 +135,137 @@ data:
         - x_search
         - memory
         - context_engine
+        - cronjob
+        - computer_use
+        - messaging
+        - homeassistant
+        - spotify
+        - discord
+        - discord_admin
+  skills-config.yaml: |
+    _config_version: 41
+    model:
+      default: groq-openai-gpt-oss-20b
+      provider: custom
+      base_url: http://litellm:4000/v1
+      api_key: ${LITELLM_MASTER_KEY}
+    providers:
+      custom:
+        models:
+          groq-qwen-qwen3.8-27b:
+            supports_vision: true
+          groq-openai-gpt-oss-20b:
+            supports_vision: false
+          groq-openai-gpt-oss-120b:
+            supports_vision: false
+    auxiliary:
+      title_generation:
+        enabled: false
+        provider: main
+      compression:
+        provider: main
+        max_concurrency: 2
+    gateway:
+      platforms:
+        api_server:
+          enabled: false
+    # Skill discovery/learning is loaded only for tasks routed here. Agent-created
+    # skills are backed up and curated, but never auto-deleted or auto-merged.
+    platform_toolsets:
+      api_server:
+        - skills
+        - clarify
+    skills:
+      write_approval: false
+    curator:
+      enabled: true
+      interval_hours: 24
+      min_idle_hours: 2
+      stale_after_days: 30
+      archive_after_days: 90
+      consolidate: false
+      prune_builtins: false
+      archive_ttl_days: 0
+      backup:
+        enabled: true
+        keep: 5
+    terminal:
+      backend: docker
+      docker_network: false
+      docker_mount_cwd_to_workspace: false
+    agent:
+      api_max_retries: 1
+      disabled_toolsets:
+        - web
+        - browser
+        - terminal
+        - file
+        - code_execution
+        - vision
+        - image_gen
+        - video
+        - video_gen
+        - x_search
+        - todo
+        - memory
+        - context_engine
+        - session_search
+        - delegation
+        - cronjob
+        - computer_use
+        - messaging
+        - homeassistant
+        - spotify
+        - discord
+        - discord_admin
+  agent-config.yaml: |
+    _config_version: 41
+    model:
+      default: groq-openai-gpt-oss-20b
+      provider: custom
+      base_url: http://litellm:4000/v1
+      api_key: ${LITELLM_MASTER_KEY}
+    auxiliary:
+      title_generation:
+        enabled: false
+        provider: main
+      compression:
+        provider: main
+        max_concurrency: 2
+    gateway:
+      platforms:
+        api_server:
+          enabled: false
+    # Expensive delegation schema is available only when Daiki detects an
+    # explicit multi-agent/delegation request.
+    platform_toolsets:
+      api_server:
+        - delegation
+        - clarify
+    terminal:
+      backend: docker
+      docker_network: false
+      docker_mount_cwd_to_workspace: false
+    tool_loop_guardrails:
+      non_interactive_hard_stop_enabled: true
+    agent:
+      api_max_retries: 1
+      disabled_toolsets:
+        - web
+        - browser
+        - terminal
+        - file
+        - code_execution
+        - vision
+        - image_gen
+        - video
+        - video_gen
+        - x_search
+        - skills
+        - todo
+        - memory
+        - context_engine
+        - session_search
         - cronjob
         - computer_use
         - messaging
@@ -357,9 +489,11 @@ spec:
             - sh
             - -ec
             - |
-              install -d -m 0750 -o 10000 -g 10000 /data/profiles/user /data/profiles/research /data/profiles/guest /data/profiles/guest-media
+              install -d -m 0750 -o 10000 -g 10000 /data/profiles/user /data/profiles/skills /data/profiles/agent /data/profiles/research /data/profiles/guest /data/profiles/guest-media
               install -m 0600 -o 10000 -g 10000 /bootstrap/config.yaml /data/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/user-config.yaml /data/profiles/user/config.yaml
+              install -m 0600 -o 10000 -g 10000 /bootstrap/skills-config.yaml /data/profiles/skills/config.yaml
+              install -m 0600 -o 10000 -g 10000 /bootstrap/agent-config.yaml /data/profiles/agent/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/research-config.yaml /data/profiles/research/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/guest-config.yaml /data/profiles/guest/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/guest-media-config.yaml /data/profiles/guest-media/config.yaml
@@ -368,11 +502,13 @@ spec:
               chown 10000:10000 /runtime-secrets/litellm.env
               ln -sfn /runtime-secrets/litellm.env /data/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/user/.env
+              ln -sfn /runtime-secrets/litellm.env /data/profiles/skills/.env
+              ln -sfn /runtime-secrets/litellm.env /data/profiles/agent/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/research/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/guest/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/guest-media/.env
-              touch /data/profiles/research/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
-              chown 10000:10000 /data/profiles/research/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
+              touch /data/profiles/user/.no-bundled-skills /data/profiles/agent/.no-bundled-skills /data/profiles/research/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
+              chown 10000:10000 /data/profiles/user/.no-bundled-skills /data/profiles/agent/.no-bundled-skills /data/profiles/research/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
           env:
             - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
             - {name: API_SERVER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: hermes-api-key}}}
@@ -381,6 +517,8 @@ spec:
             - {name: runtime-secrets, mountPath: /runtime-secrets}
             - {name: config, mountPath: /bootstrap/config.yaml, subPath: config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/user-config.yaml, subPath: user-config.yaml, readOnly: true}
+            - {name: config, mountPath: /bootstrap/skills-config.yaml, subPath: skills-config.yaml, readOnly: true}
+            - {name: config, mountPath: /bootstrap/agent-config.yaml, subPath: agent-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/research-config.yaml, subPath: research-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/guest-config.yaml, subPath: guest-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/guest-media-config.yaml, subPath: guest-media-config.yaml, readOnly: true}
