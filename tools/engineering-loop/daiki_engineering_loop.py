@@ -211,7 +211,7 @@ def guest_headers(seed:int,name:str="Daiki Loop") -> dict[str,str]:
     }
 
 def header_metrics(h:dict[str,str]) -> dict[str,Any]:
-    keys=["x-daiki-model-alias","x-daiki-model-physical","x-daiki-inference-upstream","x-daiki-fallback-model","x-daiki-retry-attempts","x-daiki-context-trimmed","x-daiki-hermes-profile","x-daiki-workload","x-daiki-queue-wait-ms","x-daiki-admission-wait-ms","x-daiki-admission-tokens","x-daiki-admission-spillover"]
+    keys=["x-daiki-model-alias","x-daiki-model-physical","x-daiki-inference-upstream","x-daiki-fallback-model","x-daiki-retry-attempts","x-daiki-context-trimmed","x-daiki-hermes-profile","x-daiki-workload","x-daiki-response-language","x-daiki-queue-wait-ms","x-daiki-admission-wait-ms","x-daiki-admission-tokens","x-daiki-admission-spillover"]
     return {k:h.get(k,"") for k in keys if h.get(k) is not None}
 
 def add_http(report:Report,name:str,group:str,r:HTTPResult,ok:Callable[[HTTPResult],bool],detail:str="") -> Result:
@@ -268,6 +268,24 @@ def run_api_suite(api:API,report:Report,seed_base:int|None=None) -> None:
         down=api.request("GET",f"/guest/attachments/{aid}",headers=h)
         report.add(Result("file-download","file",PASS if down.status==200 and DOC_MARKER.encode() in down.body else FAIL,down.latency_ms,down.status,f"bytes={len(down.body)}",{}))
         cleanup(api,aid,h)
+
+    # Exact production regression: a language-neutral English attachment sentence
+    # must not switch an established Thai conversation to another language.
+    lh=guest_headers(seed_base+15,"Loop Thai Attachment")
+    lup=api.multipart("/guest/attachments",DOC_FIXTURE,lh,"file"); lud=json_obj(lup.body) or {}; laid=lud.get("id") if isinstance(lud,dict) else None
+    if laid:
+        lmessages=[
+            {"role":"user","content":"ตอนนี้เราคุยกันเป็นภาษาไทย ช่วยตอบภาษาไทย"},
+            {"role":"assistant","content":"ได้ครับ ผมจะตอบเป็นภาษาไทย"},
+            {"role":"user","content":"Please review the attached content."},
+        ]
+        lchat=api.request("POST","/guest/chat",headers=lh,json_body={"model":"fast","attachmentIds":[laid],"messages":lmessages,"stream":False})
+        ltxt=chat_text(lchat.body).strip(); lang=lchat.headers.get("x-daiki-response-language","")
+        thai=bool(re.search(r"[\u0E00-\u0E7F]",ltxt)); han=len(re.findall(r"[\u4E00-\u9FFF]",ltxt))
+        report.add(Result("thai-attachment-language","quality",PASS if lchat.status==200 and lang=="th-TH" and thai and han<8 else FAIL,lchat.latency_ms,lchat.status,f"lang={lang} thai={thai} han={han} {ltxt[:120]}",header_metrics(lchat.headers)))
+        cleanup(api,laid,lh)
+    else:
+        report.add(Result("thai-attachment-language","quality",FAIL,lup.latency_ms,lup.status,"language fixture upload failed",{}))
 
     # Production document parsers: PDF, XLSX, and a large CSV target deep in the file.
     with tempfile.TemporaryDirectory(prefix="daiki-doc-e2e-") as td:
