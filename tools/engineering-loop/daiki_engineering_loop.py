@@ -307,6 +307,7 @@ def run_hermes_suite(context:str,namespace:str,report:Report)->None:
         "skills":{"maxTools":3,"maxToolBytes":4200,"maxSkillsBytes":2200},
         "agent":{"maxTools":1,"maxToolBytes":5000,"maxSkillsBytes":200},
         "research":{"maxTools":0,"maxToolBytes":64,"maxSkillsBytes":200},
+        "vision":{"maxTools":0,"maxToolBytes":64,"maxSkillsBytes":200},
         "guest":{"maxTools":0,"maxToolBytes":64,"maxSkillsBytes":200},
     }
     for profile,budget in budgets.items():

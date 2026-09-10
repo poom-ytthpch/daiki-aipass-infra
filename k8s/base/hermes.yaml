@@ -34,6 +34,7 @@ data:
         - skills
         - agent
         - research
+        - vision
         - guest
         - guest-media
       api_server:
@@ -403,6 +404,76 @@ data:
         - spotify
         - discord
         - discord_admin
+  vision-config.yaml: |
+    _config_version: 41
+    model:
+      default: groq-qwen-qwen3.8-27b
+      provider: custom
+      base_url: http://litellm:4000/v1
+      api_key: ${LITELLM_MASTER_KEY}
+    providers:
+      custom:
+        models:
+          groq-qwen-qwen3.8-27b:
+            supports_vision: true
+          groq-openai-gpt-oss-20b:
+            supports_vision: false
+          groq-openai-gpt-oss-120b:
+            supports_vision: false
+    auxiliary:
+      title_generation:
+        enabled: false
+        provider: main
+      compression:
+        provider: main
+        max_concurrency: 2
+    gateway:
+      platforms:
+        api_server:
+          enabled: false
+    # Authenticated image turns use a dedicated zero-tool profile so pixels are
+    # always passed natively. Web evidence may still be injected by Daiki before
+    # inference; the profile itself never needs browser/vision helper tools.
+    platform_toolsets:
+      api_server: []
+    terminal:
+      backend: docker
+      docker_network: false
+      docker_mount_cwd_to_workspace: false
+    agent:
+      api_max_retries: 1
+      image_input_mode: native
+      task_completion_guidance: false
+      parallel_tool_call_guidance: false
+      environment_probe: false
+      coding_context: "off"
+      verify_guidance: false
+      tool_use_enforcement: false
+      execution_guidance: false
+      disabled_toolsets:
+        - web
+        - browser
+        - terminal
+        - file
+        - code_execution
+        - vision
+        - image_gen
+        - video
+        - video_gen
+        - x_search
+        - skills
+        - todo
+        - memory
+        - context_engine
+        - session_search
+        - delegation
+        - cronjob
+        - computer_use
+        - messaging
+        - homeassistant
+        - spotify
+        - discord
+        - discord_admin
   guest-config.yaml: |
     _config_version: 41
     model:
@@ -570,12 +641,13 @@ spec:
             - sh
             - -ec
             - |
-              install -d -m 0750 -o 10000 -g 10000 /data/profiles/user /data/profiles/skills /data/profiles/agent /data/profiles/research /data/profiles/guest /data/profiles/guest-media
+              install -d -m 0750 -o 10000 -g 10000 /data/profiles/user /data/profiles/skills /data/profiles/agent /data/profiles/research /data/profiles/vision /data/profiles/guest /data/profiles/guest-media
               install -m 0600 -o 10000 -g 10000 /bootstrap/config.yaml /data/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/user-config.yaml /data/profiles/user/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/skills-config.yaml /data/profiles/skills/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/agent-config.yaml /data/profiles/agent/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/research-config.yaml /data/profiles/research/config.yaml
+              install -m 0600 -o 10000 -g 10000 /bootstrap/vision-config.yaml /data/profiles/vision/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/guest-config.yaml /data/profiles/guest/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/guest-media-config.yaml /data/profiles/guest-media/config.yaml
               umask 077
@@ -586,10 +658,11 @@ spec:
               ln -sfn /runtime-secrets/litellm.env /data/profiles/skills/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/agent/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/research/.env
+              ln -sfn /runtime-secrets/litellm.env /data/profiles/vision/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/guest/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/guest-media/.env
-              touch /data/profiles/user/.no-bundled-skills /data/profiles/agent/.no-bundled-skills /data/profiles/research/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
-              chown 10000:10000 /data/profiles/user/.no-bundled-skills /data/profiles/agent/.no-bundled-skills /data/profiles/research/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
+              touch /data/profiles/user/.no-bundled-skills /data/profiles/agent/.no-bundled-skills /data/profiles/research/.no-bundled-skills /data/profiles/vision/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
+              chown 10000:10000 /data/profiles/user/.no-bundled-skills /data/profiles/agent/.no-bundled-skills /data/profiles/research/.no-bundled-skills /data/profiles/vision/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
           env:
             - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
             - {name: API_SERVER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: hermes-api-key}}}
@@ -601,6 +674,7 @@ spec:
             - {name: config, mountPath: /bootstrap/skills-config.yaml, subPath: skills-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/agent-config.yaml, subPath: agent-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/research-config.yaml, subPath: research-config.yaml, readOnly: true}
+            - {name: config, mountPath: /bootstrap/vision-config.yaml, subPath: vision-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/guest-config.yaml, subPath: guest-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/guest-media-config.yaml, subPath: guest-media-config.yaml, readOnly: true}
         - name: seed-skills-profile
