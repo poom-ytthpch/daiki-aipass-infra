@@ -835,3 +835,31 @@ spec:
   selector: {app: hermes}
   ports:
     - {name: http, port: 8642, targetPort: http}
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hermes-internal
+  namespace: daiki-ai-passport
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ["hermes.infra.local"]
+      secretName: daiki-ai-passport-infra-local-tls
+  rules:
+    - host: hermes.infra.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hermes
+                port:
+                  number: 8642

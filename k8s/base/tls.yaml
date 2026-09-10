@@ -12,6 +12,7 @@ spec:
     - ai.infra.local
     - api.ai.infra.local
     - auth.ai.infra.local
+    - hermes.infra.local
 
 ---
 apiVersion: cert-manager.io/v1
