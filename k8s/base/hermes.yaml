@@ -503,11 +503,14 @@ data:
       platforms:
         api_server:
           enabled: false
-    # Authenticated image turns use a dedicated zero-tool profile so pixels are
-    # always passed natively. Web evidence may still be injected by Daiki before
-    # inference; the profile itself never needs browser/vision helper tools.
+    # Image turns use native pixels plus one curated read-only image-analysis
+    # skill. Web evidence may still be injected by Daiki before inference; no
+    # browser, filesystem, shell, code execution or image-generation tool is exposed.
     platform_toolsets:
-      api_server: []
+      api_server:
+        - skills
+    skills:
+      write_approval: false
     terminal:
       backend: docker
       docker_network: false
@@ -533,7 +536,6 @@ data:
         - video
         - video_gen
         - x_search
-        - skills
         - todo
         - memory
         - context_engine
@@ -632,8 +634,8 @@ data:
         api_server:
           enabled: false
     # Guest skill mode is intentionally narrower than the authenticated skills
-    # profile. It exists only so explicit @graft can view the curated
-    # graft-code-intelligence skill. No shell, filesystem, web or code execution.
+    # profile. It exposes only Daiki's curated document/image guidance and Graft
+    # lookup; no shell, filesystem, web or code execution is available.
     platform_toolsets:
       api_server:
         - skills
@@ -844,12 +846,28 @@ spec:
             - sh
             - -ec
             - |
-              install -d -m 0755 -o 10000 -g 10000 /data/profiles/guest-skills/skills/daiki/graft-code-intelligence
+              install -d -m 0755 -o 10000 -g 10000 /data/profiles/guest-skills/skills/daiki/daiki-document-analysis /data/profiles/guest-skills/skills/daiki/daiki-image-analysis /data/profiles/guest-skills/skills/daiki/graft-code-intelligence
+              install -m 0644 -o 10000 -g 10000 /bootstrap/skill-daiki-document-analysis.md /data/profiles/guest-skills/skills/daiki/daiki-document-analysis/SKILL.md
+              install -m 0644 -o 10000 -g 10000 /bootstrap/skill-daiki-image-analysis.md /data/profiles/guest-skills/skills/daiki/daiki-image-analysis/SKILL.md
               install -m 0644 -o 10000 -g 10000 /bootstrap/skill-graft-code-intelligence.md /data/profiles/guest-skills/skills/daiki/graft-code-intelligence/SKILL.md
               chown -R 10000:10000 /data/profiles/guest-skills/skills
           volumeMounts:
             - {name: data, mountPath: /data}
+            - {name: config, mountPath: /bootstrap/skill-daiki-document-analysis.md, subPath: skill-daiki-document-analysis.md, readOnly: true}
+            - {name: config, mountPath: /bootstrap/skill-daiki-image-analysis.md, subPath: skill-daiki-image-analysis.md, readOnly: true}
             - {name: config, mountPath: /bootstrap/skill-graft-code-intelligence.md, subPath: skill-graft-code-intelligence.md, readOnly: true}
+        - name: seed-vision-skill-profile
+          image: nousresearch/hermes-agent:v2026.9.7
+          command:
+            - sh
+            - -ec
+            - |
+              install -d -m 0755 -o 10000 -g 10000 /data/profiles/vision/skills/daiki/daiki-image-analysis
+              install -m 0644 -o 10000 -g 10000 /bootstrap/skill-daiki-image-analysis.md /data/profiles/vision/skills/daiki/daiki-image-analysis/SKILL.md
+              chown -R 10000:10000 /data/profiles/vision/skills
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: config, mountPath: /bootstrap/skill-daiki-image-analysis.md, subPath: skill-daiki-image-analysis.md, readOnly: true}
         - name: seed-skills-profile
           image: nousresearch/hermes-agent:v2026.9.7
           command:
