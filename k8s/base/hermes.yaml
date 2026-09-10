@@ -11,6 +11,15 @@ data:
       provider: custom
       base_url: http://litellm:4000/v1
       api_key: ${LITELLM_MASTER_KEY}
+    providers:
+      custom:
+        models:
+          groq-qwen-qwen3.8-27b:
+            supports_vision: true
+          groq-openai-gpt-oss-20b:
+            supports_vision: false
+          groq-openai-gpt-oss-120b:
+            supports_vision: false
     auxiliary:
       title_generation:
         enabled: false
@@ -55,6 +64,7 @@ data:
       non_interactive_hard_stop_enabled: true
     agent:
       api_max_retries: 1
+      image_input_mode: native
       disabled_toolsets:
         - terminal
         - file
@@ -73,6 +83,15 @@ data:
       provider: custom
       base_url: http://litellm:4000/v1
       api_key: ${LITELLM_MASTER_KEY}
+    providers:
+      custom:
+        models:
+          groq-qwen-qwen3.8-27b:
+            supports_vision: true
+          groq-openai-gpt-oss-20b:
+            supports_vision: false
+          groq-openai-gpt-oss-120b:
+            supports_vision: false
     auxiliary:
       title_generation:
         enabled: false
@@ -101,6 +120,7 @@ data:
       non_interactive_hard_stop_enabled: true
     agent:
       api_max_retries: 1
+      image_input_mode: native
       disabled_toolsets:
         - web
         - browser
@@ -177,6 +197,15 @@ data:
       provider: custom
       base_url: http://litellm:4000/v1
       api_key: ${LITELLM_MASTER_KEY}
+    providers:
+      custom:
+        models:
+          groq-qwen-qwen3.8-27b:
+            supports_vision: true
+          groq-openai-gpt-oss-20b:
+            supports_vision: false
+          groq-openai-gpt-oss-120b:
+            supports_vision: false
     auxiliary:
       title_generation:
         enabled: false
@@ -195,6 +224,7 @@ data:
       docker_mount_cwd_to_workspace: false
     agent:
       api_max_retries: 1
+      image_input_mode: native
       disabled_toolsets:
         - web
         - browser
