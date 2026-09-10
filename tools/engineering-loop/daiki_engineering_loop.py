@@ -165,7 +165,7 @@ def guest_headers(seed:int,name:str="Daiki Loop") -> dict[str,str]:
     }
 
 def header_metrics(h:dict[str,str]) -> dict[str,Any]:
-    keys=["x-daiki-model-alias","x-daiki-model-physical","x-daiki-inference-upstream","x-daiki-fallback-model","x-daiki-retry-attempts","x-daiki-context-trimmed","x-daiki-hermes-profile","x-daiki-workload","x-daiki-queue-wait-ms","x-daiki-admission-wait-ms","x-daiki-admission-tokens"]
+    keys=["x-daiki-model-alias","x-daiki-model-physical","x-daiki-inference-upstream","x-daiki-fallback-model","x-daiki-retry-attempts","x-daiki-context-trimmed","x-daiki-hermes-profile","x-daiki-workload","x-daiki-queue-wait-ms","x-daiki-admission-wait-ms","x-daiki-admission-tokens","x-daiki-admission-spillover"]
     return {k:h.get(k,"") for k in keys if h.get(k) is not None}
 
 def add_http(report:Report,name:str,group:str,r:HTTPResult,ok:Callable[[HTTPResult],bool],detail:str="") -> Result:
