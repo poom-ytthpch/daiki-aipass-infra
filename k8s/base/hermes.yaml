@@ -522,6 +522,16 @@ spec:
             - {name: config, mountPath: /bootstrap/research-config.yaml, subPath: research-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/guest-config.yaml, subPath: guest-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/guest-media-config.yaml, subPath: guest-media-config.yaml, readOnly: true}
+        - name: seed-skills-profile
+          image: nousresearch/hermes-agent:v2026.9.7
+          command:
+            - sh
+            - -ec
+            - |
+              HERMES_HOME=/data/profiles/skills /opt/hermes/.venv/bin/python -m hermes_cli.main skills opt-in --sync
+              chown -R 10000:10000 /data/profiles/skills/skills /data/profiles/skills/.bundled_skills* 2>/dev/null || true
+          volumeMounts:
+            - {name: data, mountPath: /data}
       containers:
         - name: hermes
           image: nousresearch/hermes-agent:v2026.9.7
