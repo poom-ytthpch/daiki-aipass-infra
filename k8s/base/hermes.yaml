@@ -663,6 +663,7 @@ spec:
               ln -sfn /runtime-secrets/litellm.env /data/profiles/guest-media/.env
               touch /data/profiles/user/.no-bundled-skills /data/profiles/agent/.no-bundled-skills /data/profiles/research/.no-bundled-skills /data/profiles/vision/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
               chown 10000:10000 /data/profiles/user/.no-bundled-skills /data/profiles/agent/.no-bundled-skills /data/profiles/research/.no-bundled-skills /data/profiles/vision/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
+              chown -R 10000:10000 /data/profiles/vision
           env:
             - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
             - {name: API_SERVER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: hermes-api-key}}}

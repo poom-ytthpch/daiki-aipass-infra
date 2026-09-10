@@ -19,6 +19,7 @@ import json
 import os
 import pathlib
 import random
+import shlex
 import re
 import socket
 import statistics
@@ -298,7 +299,11 @@ def ready_hermes_pod(context:str,namespace:str)->str:
     return rows[-1]
 
 def kubectl_exec(context:str,namespace:str,pod:str,shell_script:str,timeout:float=240.0)->tuple[int,str,float]:
-    return run_cmd(["kubectl","--context",context,"-n",namespace,"exec",pod,"--","sh","-lc",shell_script],timeout=timeout)
+    # kubectl exec starts as container root in the s6 image while the gateway itself
+    # runs as uid/gid 10000. Run probes as the production identity so the loop cannot
+    # leave root-owned logs/cache/session files in shared profile PVCs.
+    wrapped=f"exec setpriv --reuid=10000 --regid=10000 --init-groups sh -lc {shlex.quote(shell_script)}"
+    return run_cmd(["kubectl","--context",context,"-n",namespace,"exec",pod,"--","sh","-lc",wrapped],timeout=timeout)
 
 def run_hermes_suite(context:str,namespace:str,report:Report)->None:
     pod=ready_hermes_pod(context,namespace)
