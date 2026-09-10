@@ -51,6 +51,7 @@ data:
     tool_loop_guardrails:
       non_interactive_hard_stop_enabled: true
     agent:
+      api_max_retries: 1
       disabled_toolsets:
         - terminal
         - file
@@ -82,6 +83,7 @@ data:
       docker_network: false
       docker_mount_cwd_to_workspace: false
     agent:
+      api_max_retries: 1
       disabled_toolsets:
         - web
         - browser
@@ -129,6 +131,7 @@ data:
       docker_network: false
       docker_mount_cwd_to_workspace: false
     agent:
+      api_max_retries: 1
       disabled_toolsets:
         - web
         - browser
@@ -190,7 +193,7 @@ spec:
               install -m 0600 -o 10000 -g 10000 /bootstrap/guest-config.yaml /data/profiles/guest/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/guest-media-config.yaml /data/profiles/guest-media/config.yaml
               umask 077
-              printf 'LITELLM_MASTER_KEY=%s\n' "$LITELLM_MASTER_KEY" > /runtime-secrets/litellm.env
+              printf 'LITELLM_MASTER_KEY=%s\nAPI_SERVER_KEY=%s\n' "$LITELLM_MASTER_KEY" "$API_SERVER_KEY" > /runtime-secrets/litellm.env
               chown 10000:10000 /runtime-secrets/litellm.env
               ln -sfn /runtime-secrets/litellm.env /data/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/guest/.env
@@ -199,6 +202,7 @@ spec:
               chown 10000:10000 /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
           env:
             - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
+            - {name: API_SERVER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: hermes-api-key}}}
           volumeMounts:
             - {name: data, mountPath: /data}
             - {name: runtime-secrets, mountPath: /runtime-secrets}
