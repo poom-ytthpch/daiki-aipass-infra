@@ -346,14 +346,15 @@ PYV"""
     code,out,ms=kubectl_exec(context,namespace,pod,vision_script,90)
     vision_ok=code==0 and "supportsVision= True" in out and "mode= native" in out and "unchanged= True" in out
     report.add(Result("native-vision-routing","hermes",PASS if vision_ok else FAIL,ms,None,out[-240:].replace("\n"," "),{}))
-    script='printf "files="; find /opt/data/profiles/skills/skills -name SKILL.md | wc -l; printf "journey="; HERMES_HOME=/opt/data/profiles/skills /opt/hermes/.venv/bin/hermes journey --json 2>/dev/null | /opt/hermes/.venv/bin/python -c "import json,sys; d=json.load(sys.stdin); print(len(d.get(\"nodes\",[])))"'
+    script='printf "files="; find /opt/data/profiles/skills/skills -name SKILL.md | wc -l; printf "custom="; for s in daiki-document-analysis daiki-image-analysis graft-code-intelligence; do find /opt/data/profiles/skills/skills -path "*/$s/SKILL.md" -print -quit; done | wc -l; printf "journey="; HERMES_HOME=/opt/data/profiles/skills /opt/hermes/.venv/bin/hermes journey --json 2>/dev/null | /opt/hermes/.venv/bin/python -c "import json,sys; d=json.load(sys.stdin); print(len(d.get(\"nodes\",[])))"'
     code,out,ms=kubectl_exec(context,namespace,pod,script,90)
-    m=re.search(r"files=\s*(\d+).*journey=\s*(\d+)",out,re.S)
-    metrics={"skillFiles":int(m.group(1)) if m else 0,"journeyNodes":int(m.group(2)) if m else 0}
-    report.add(Result("skill-inventory","learning",PASS if code==0 and metrics["skillFiles"]>=50 else FAIL,ms,None,f"files={metrics['skillFiles']} journey={metrics['journeyNodes']}",metrics))
+    m=re.search(r"files=\s*(\d+).*custom=\s*(\d+).*journey=\s*(\d+)",out,re.S)
+    metrics={"skillFiles":int(m.group(1)) if m else 0,"customSkills":int(m.group(2)) if m else 0,"journeyNodes":int(m.group(3)) if m else 0}
+    report.add(Result("skill-inventory","learning",PASS if code==0 and metrics["skillFiles"]>=53 and metrics["customSkills"]==3 else FAIL,ms,None,f"files={metrics['skillFiles']} custom={metrics['customSkills']} journey={metrics['journeyNodes']}",metrics))
     cases=[
         ("user","plain-intelligence","Reply exactly HERMES_USER_OK","HERMES_USER_OK",None),
-        ("skills","skill-view","Use skill_view to inspect the installed skill named codebase-inspection, then answer with SKILL_VIEW_OK followed by one short principle from that skill.","SKILL_VIEW_OK","skills"),
+        ("skills","skill-graft","Use skill_view to inspect the installed skill named graft-code-intelligence, then answer with GRAFT_SKILL_OK followed by one token-saving principle from that skill.","GRAFT_SKILL_OK","skills"),
+        ("skills","skill-document","Use skill_view to inspect the installed skill named daiki-document-analysis, then answer with DOCUMENT_SKILL_OK followed by one rule for bounded attachment excerpts.","DOCUMENT_SKILL_OK","skills"),
         ("agent","delegation","Use delegate_task exactly once for the tiny task 'What is 6 times 7?'. After it returns, answer exactly AGENT_DELEGATION_OK 42.","AGENT_DELEGATION_OK","delegation"),
     ]
     for profile,name,prompt,needle,toolsets in cases:
