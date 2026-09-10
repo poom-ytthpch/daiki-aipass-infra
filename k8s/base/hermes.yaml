@@ -174,9 +174,67 @@ data:
     platform_toolsets:
       api_server:
         - skills
-        - clarify
     skills:
       write_approval: false
+      # Keep the full bundled corpus on disk for CLI/curator, but expose only a
+      # compact high-utility set to API turns. Learned skills are not listed here
+      # and therefore become visible automatically after promotion.
+      platform_disabled:
+        api_server:
+          - airtable
+          - apple-notes
+          - apple-reminders
+          - architecture-diagram
+          - arxiv
+          - ascii-video
+          - baoyu-infographic
+          - blocked-page-recovery
+          - box
+          - claude-code
+          - claude-design
+          - codex
+          - competitor-news-monitor
+          - computer-use
+          - design-md
+          - docx
+          - dogfood
+          - email-inbox-triage
+          - findmy
+          - gif-search
+          - google-workspace
+          - grounded-citations
+          - hermes-agent-skill-authoring
+          - himalaya
+          - humanizer
+          - imessage
+          - inspecting-hermes-desktop-dom
+          - llm-wiki
+          - manim-video
+          - maps
+          - node-inspect-debugger
+          - notion
+          - obsidian
+          - opencode
+          - p5js
+          - pdf
+          - popular-web-designs
+          - powerpoint
+          - product-price-monitor
+          - python-debugpy
+          - reddit-reading
+          - requesting-code-review
+          - rss-feeds
+          - sdlc-review
+          - simplify-code
+          - songsee
+          - songwriting-and-ai-music
+          - spike
+          - systematic-debugging
+          - teams-meeting-pipeline
+          - test-driven-development
+          - xlsx
+          - xurl
+          - youtube-content
     curator:
       enabled: true
       interval_hours: 24
@@ -241,7 +299,6 @@ data:
     platform_toolsets:
       api_server:
         - delegation
-        - clarify
     terminal:
       backend: docker
       docker_network: false

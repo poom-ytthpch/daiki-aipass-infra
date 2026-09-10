@@ -17,3 +17,8 @@ Use `--skip-load` for feature-only validation or `--load-levels 1,2,5` for a sma
 Acceptance policy: functional failures are `FAIL`; a capability that is implemented but cannot run because an external provider is not configured (for example image generation) is `BLOCKED`, which makes the overall result `DEGRADED`. The load ramp stops after an error rate above 10% instead of intentionally hammering a provider already at saturation.
 
 Skill growth policy: learning happens through the dedicated Hermes `skills` profile. The curator runs daily after idle time, creates backups, and can mark/archive stale agent-created skills. Automatic LLM consolidation stays disabled; use an engineering-loop quality run plus `hermes curator run --dry-run` before any manual consolidation/promotion.
+
+## Release gates
+The runner enforces prompt-size budgets for Hermes profiles, reports per-model token-admission wait time during load, inventories the skills corpus/Journey, and emits an API coverage matrix. Authenticated/admin mutations are intentionally classified as `isolated-auth` rather than exercised against real production users.
+
+A production release is healthy when functional cases pass, c5 stays error-free, higher load is paced by admission control rather than provider 429s, and prompt-size budgets remain within profile thresholds. External image generation stays `BLOCKED` until an image provider credential is configured.

@@ -164,7 +164,7 @@ def guest_headers(seed:int,name:str="Daiki Loop") -> dict[str,str]:
     }
 
 def header_metrics(h:dict[str,str]) -> dict[str,Any]:
-    keys=["x-daiki-model-alias","x-daiki-model-physical","x-daiki-inference-upstream","x-daiki-fallback-model","x-daiki-retry-attempts","x-daiki-context-trimmed","x-daiki-hermes-profile","x-daiki-workload","x-daiki-queue-wait-ms"]
+    keys=["x-daiki-model-alias","x-daiki-model-physical","x-daiki-inference-upstream","x-daiki-fallback-model","x-daiki-retry-attempts","x-daiki-context-trimmed","x-daiki-hermes-profile","x-daiki-workload","x-daiki-queue-wait-ms","x-daiki-admission-wait-ms","x-daiki-admission-tokens"]
     return {k:h.get(k,"") for k in keys if h.get(k) is not None}
 
 def add_http(report:Report,name:str,group:str,r:HTTPResult,ok:Callable[[HTTPResult],bool],detail:str="") -> Result:
@@ -273,14 +273,16 @@ def run_load(api:API,report:Report,levels:list[int],seed_base:int=20000) -> None
         start=time.perf_counter()
         with concurrent.futures.ThreadPoolExecutor(max_workers=level) as ex: rows=list(ex.map(one,range(level)))
         elapsed=(time.perf_counter()-start)*1000; lats=[r.latency_ms for r,_ in rows]
-        passed=0; statuses={}; models={}; fallbacks=0
+        passed=0; statuses={}; models={}; fallbacks=0; admission=[]; admission_tokens=[]
         for r,marker in rows:
             statuses[r.status]=statuses.get(r.status,0)+1
             model=r.headers.get("x-daiki-model-physical",""); models[model]=models.get(model,0)+1
             if r.headers.get("x-daiki-fallback-model"): fallbacks+=1
+            with contextlib.suppress(Exception): admission.append(float(r.headers.get("x-daiki-admission-wait-ms","0") or 0))
+            with contextlib.suppress(Exception): admission_tokens.append(int(r.headers.get("x-daiki-admission-tokens","0") or 0))
             if r.status==200 and marker in chat_text(r.body): passed+=1
-        error_rate=(level-passed)/max(1,level)
-        report.add(Result(f"inference-c{level}","load",PASS if error_rate<=0.10 else FAIL,elapsed,None,f"ok={passed}/{level} error={error_rate:.0%} p50={percentile(lats,.50):.0f}ms p95={percentile(lats,.95):.0f}ms",{"requests":level,"concurrency":level,"passed":passed,"errorRate":error_rate,"p50Ms":percentile(lats,.50),"p95Ms":percentile(lats,.95),"maxMs":max(lats or [0]),"statuses":statuses,"models":models,"fallbacks":fallbacks}))
+        error_rate=(level-passed)/max(1,level); adm_p95=percentile(admission,.95)
+        report.add(Result(f"inference-c{level}","load",PASS if error_rate<=0.10 else FAIL,elapsed,None,f"ok={passed}/{level} error={error_rate:.0%} p50={percentile(lats,.50):.0f}ms p95={percentile(lats,.95):.0f}ms admission-p95={adm_p95:.0f}ms",{"requests":level,"concurrency":level,"passed":passed,"errorRate":error_rate,"p50Ms":percentile(lats,.50),"p95Ms":percentile(lats,.95),"maxMs":max(lats or [0]),"statuses":statuses,"models":models,"fallbacks":fallbacks,"admissionP50Ms":percentile(admission,.50),"admissionP95Ms":adm_p95,"admissionTokensMax":max(admission_tokens or [0])}))
         if error_rate>0.10:
             report.add(Result("ramp-stop","load",SKIP,0,None,f"Stopped after c{level}; error rate exceeded 10%",{})); break
 
@@ -299,38 +301,57 @@ def kubectl_exec(context:str,namespace:str,pod:str,shell_script:str,timeout:floa
 
 def run_hermes_suite(context:str,namespace:str,report:Report)->None:
     pod=ready_hermes_pod(context,namespace)
-    # Prompt-size is the primary token-regression signal because it is offline and deterministic.
-    for profile in ("user","skills","agent","research","guest"):
+    budgets={
+        "user":{"maxTools":2,"maxToolBytes":3000,"maxSkillsBytes":200},
+        "skills":{"maxTools":3,"maxToolBytes":4200,"maxSkillsBytes":2200},
+        "agent":{"maxTools":1,"maxToolBytes":5000,"maxSkillsBytes":200},
+        "research":{"maxTools":0,"maxToolBytes":64,"maxSkillsBytes":200},
+        "guest":{"maxTools":0,"maxToolBytes":64,"maxSkillsBytes":200},
+    }
+    for profile,budget in budgets.items():
         home=f"/opt/data/profiles/{profile}"
-        script=f'HERMES_HOME={home} /opt/hermes/.venv/bin/python -m hermes_cli.main prompt-size --platform api_server --json 2>/dev/null'
+        script=f'HERMES_HOME={home} /opt/hermes/.venv/bin/hermes prompt-size --platform api_server --json 2>/dev/null'
         code,out,ms=kubectl_exec(context,namespace,pod,script,90)
         try:
-            d=json.loads(out[out.find("{"):]); metrics={"systemBytes":d["system_prompt"]["bytes"],"skillsIndexBytes":d["skills_index"]["bytes"],"toolCount":d["tools"]["count"],"toolBytes":d["tools"]["json_bytes"]}; ok=code==0
+            d=json.loads(out[out.find("{"):])
+            metrics={"systemBytes":d["system_prompt"]["bytes"],"skillsIndexBytes":d["skills_index"]["bytes"],"toolCount":d["tools"]["count"],"toolBytes":d["tools"]["json_bytes"]}
+            ok=code==0 and metrics["toolCount"]<=budget["maxTools"] and metrics["toolBytes"]<=budget["maxToolBytes"] and metrics["skillsIndexBytes"]<=budget["maxSkillsBytes"]
             detail=f"system={metrics['systemBytes']}B skills={metrics['skillsIndexBytes']}B tools={metrics['toolCount']}/{metrics['toolBytes']}B"
-        except Exception as e: metrics={};ok=False;detail=f"parse failed: {e}; {out[-200:]}"
+        except Exception as e:
+            metrics={}; ok=False; detail=f"parse failed: {e}; {out[-200:]}"
         report.add(Result(f"prompt-size-{profile}","hermes",PASS if ok else FAIL,ms,None,detail,metrics))
-
-    # One-shot quality and tool checks. Usage JSON is emitted without exposing provider secrets.
+    script='printf "files="; find /opt/data/profiles/skills/skills -name SKILL.md | wc -l; printf "journey="; HERMES_HOME=/opt/data/profiles/skills /opt/hermes/.venv/bin/hermes journey --json 2>/dev/null | /opt/hermes/.venv/bin/python -c "import json,sys; d=json.load(sys.stdin); print(len(d.get(\"nodes\",[])))"'
+    code,out,ms=kubectl_exec(context,namespace,pod,script,90)
+    m=re.search(r"files=(\d+).*journey=(\d+)",out,re.S)
+    metrics={"skillFiles":int(m.group(1)) if m else 0,"journeyNodes":int(m.group(2)) if m else 0}
+    report.add(Result("skill-inventory","learning",PASS if code==0 and metrics["skillFiles"]>=50 else FAIL,ms,None,f"files={metrics['skillFiles']} journey={metrics['journeyNodes']}",metrics))
     cases=[
-        ("user","plain-intelligence","Reply exactly HERMES_USER_OK","HERMES_USER_OK"),
-        ("skills","skill-view","Use skill_view to inspect the installed skill named systematic-debugging, then answer with SKILL_VIEW_OK followed by one short principle from that skill.","SKILL_VIEW_OK"),
-        ("agent","delegation","Use delegate_task exactly once for the tiny task 'What is 6 times 7?'. After it returns, answer exactly AGENT_DELEGATION_OK 42.","AGENT_DELEGATION_OK"),
+        ("user","plain-intelligence","Reply exactly HERMES_USER_OK","HERMES_USER_OK",None),
+        ("skills","skill-view","Use skill_view to inspect the installed skill named codebase-inspection, then answer with SKILL_VIEW_OK followed by one short principle from that skill.","SKILL_VIEW_OK","skills"),
+        ("agent","delegation","Use delegate_task exactly once for the tiny task 'What is 6 times 7?'. After it returns, answer exactly AGENT_DELEGATION_OK 42.","AGENT_DELEGATION_OK","delegation"),
     ]
-    for profile,name,prompt,needle in cases:
+    for profile,name,prompt,needle,toolsets in cases:
         token=uuid.uuid4().hex[:12]; usage=f"/tmp/daiki-loop-{token}.json"; home=f"/opt/data/profiles/{profile}"
-        quoted=json.dumps(prompt)
-        # sh receives a JSON-quoted prompt through a tiny Python launcher to avoid shell interpolation.
-        script=f'''set -e; HERMES_HOME={home} /opt/hermes/.venv/bin/python -m hermes_cli.main -z {json.dumps(prompt)} --usage-file {usage}; echo __USAGE__; cat {usage} 2>/dev/null || true'''
+        toolarg=f" -t {toolsets}" if toolsets else ""
+        platform="HERMES_SESSION_PLATFORM=api_server " if profile=="skills" else ""
+        qprompt=json.dumps(prompt)
+        script=f"set -e; {platform}HERMES_HOME={home} /opt/hermes/.venv/bin/hermes -z {qprompt}{toolarg} --usage-file {usage}; echo __USAGE__; cat {usage} 2>/dev/null || true"
         code,out,ms=kubectl_exec(context,namespace,pod,script,240)
         answer=out.split("__USAGE__",1)[0].strip(); usage_obj={}
         if "__USAGE__" in out:
             with contextlib.suppress(Exception): usage_obj=json.loads(out.split("__USAGE__",1)[1].strip())
         report.add(Result(name,"hermes",PASS if code==0 and needle in answer else FAIL,ms,None,answer[-240:],usage_obj if isinstance(usage_obj,dict) else {}))
-
-    # Curator preview is read-only and proves the maintenance loop can run.
-    script='HERMES_HOME=/opt/data/profiles/skills /opt/hermes/.venv/bin/python -m hermes_cli.main curator run --dry-run --sync 2>&1'
+    script='HERMES_HOME=/opt/data/profiles/skills /opt/hermes/.venv/bin/hermes curator run --dry-run --sync 2>&1'
     code,out,ms=kubectl_exec(context,namespace,pod,script,180)
     report.add(Result("curator-dry-run","learning",PASS if code==0 else FAIL,ms,None,out[-300:].replace("\n"," "),{}))
+
+def add_api_coverage(report:Report)->None:
+    covered=["GET /health/live","GET /health/ready","GET /guest/policy","POST /guest/chat","POST /guest/chat/stream","GET /guest/attachments","POST /guest/attachments","GET /guest/attachments/{id}","DELETE /guest/attachments/{id}","POST /guest/generate/file","POST /guest/generate/image"]
+    isolated=["GET /models","GET /usage","POST /chat","POST /chat/stream","chat-sessions CRUD/runs","authenticated attachments CRUD","quota reset/use","admin summary/queues/audit","admin providers/models/aliases CRUD","admin users/roles/status/quota CRUD","admin API keys/quota CRUD","admin token/guest policy mutation","Gmail OAuth connect/test/disconnect"]
+    blocked=["guest image generation: external image provider credential"]
+    report.add(Result("safe-prod","coverage",PASS,0,None,f"{len(covered)} route contracts covered",{"routes":covered}))
+    report.add(Result("isolated-auth","coverage",BLOCKED,0,None,f"{len(isolated)} authenticated/admin mutation groups require isolated test identity/environment",{"routes":isolated}))
+    report.add(Result("external-provider","coverage",BLOCKED,0,None,blocked[0],{"routes":blocked}))
 
 def free_port()->int:
     with socket.socket() as s: s.bind(("127.0.0.1",0)); return s.getsockname()[1]
@@ -372,6 +393,7 @@ def main()->int:
                 run_load(api,report,levels)
     if args.suite in ("hermes","all"):
         run_hermes_suite(args.context,args.namespace,report)
+    add_api_coverage(report)
     jp,mp=report.write(pathlib.Path(args.out))
     print(f"\nReport JSON: {jp}\nReport Markdown: {mp}\nSummary: {json.dumps(report.summary(),ensure_ascii=False)}")
     return 1 if report.summary()["counts"][FAIL] else 0
