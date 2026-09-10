@@ -36,6 +36,7 @@ data:
         - research
         - vision
         - guest
+        - guest-skills
         - guest-media
       api_server:
         max_concurrent_runs: 4
@@ -604,6 +605,79 @@ data:
         - spotify
         - discord
         - discord_admin
+  guest-skills-config.yaml: |
+    _config_version: 41
+    model:
+      default: groq-openai-gpt-oss-20b
+      provider: custom
+      base_url: http://litellm:4000/v1
+      api_key: ${LITELLM_MASTER_KEY}
+    providers:
+      custom:
+        models:
+          groq-qwen-qwen3.8-27b:
+            supports_vision: true
+          groq-openai-gpt-oss-20b:
+            supports_vision: false
+          groq-openai-gpt-oss-120b:
+            supports_vision: false
+    auxiliary:
+      title_generation:
+        enabled: false
+        provider: main
+      compression:
+        provider: main
+    gateway:
+      platforms:
+        api_server:
+          enabled: false
+    # Guest skill mode is intentionally narrower than the authenticated skills
+    # profile. It exists only so explicit @graft can view the curated
+    # graft-code-intelligence skill. No shell, filesystem, web or code execution.
+    platform_toolsets:
+      api_server:
+        - skills
+    skills:
+      write_approval: false
+    terminal:
+      backend: docker
+      docker_network: false
+      docker_mount_cwd_to_workspace: false
+    tool_loop_guardrails:
+      non_interactive_hard_stop_enabled: true
+    agent:
+      api_max_retries: 1
+      task_completion_guidance: false
+      parallel_tool_call_guidance: false
+      environment_probe: false
+      coding_context: "off"
+      verify_guidance: false
+      tool_use_enforcement: false
+      execution_guidance: false
+      image_input_mode: native
+      disabled_toolsets:
+        - web
+        - browser
+        - terminal
+        - file
+        - code_execution
+        - vision
+        - image_gen
+        - video
+        - video_gen
+        - x_search
+        - todo
+        - memory
+        - context_engine
+        - session_search
+        - delegation
+        - cronjob
+        - computer_use
+        - messaging
+        - homeassistant
+        - spotify
+        - discord
+        - discord_admin
   guest-media-config.yaml: |
     _config_version: 41
     model:
@@ -722,7 +796,7 @@ spec:
             - sh
             - -ec
             - |
-              install -d -m 0750 -o 10000 -g 10000 /data/profiles/user /data/profiles/skills /data/profiles/agent /data/profiles/research /data/profiles/vision /data/profiles/guest /data/profiles/guest-media
+              install -d -m 0750 -o 10000 -g 10000 /data/profiles/user /data/profiles/skills /data/profiles/agent /data/profiles/research /data/profiles/vision /data/profiles/guest /data/profiles/guest-skills /data/profiles/guest-media
               install -m 0600 -o 10000 -g 10000 /bootstrap/config.yaml /data/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/user-config.yaml /data/profiles/user/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/skills-config.yaml /data/profiles/skills/config.yaml
@@ -731,6 +805,7 @@ spec:
               install -m 0600 -o 10000 -g 10000 /bootstrap/vision-config.yaml /data/profiles/vision/config.yaml
               install -m 0644 -o 10000 -g 10000 /bootstrap/vision-soul.md /data/profiles/vision/SOUL.md
               install -m 0600 -o 10000 -g 10000 /bootstrap/guest-config.yaml /data/profiles/guest/config.yaml
+              install -m 0600 -o 10000 -g 10000 /bootstrap/guest-skills-config.yaml /data/profiles/guest-skills/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/guest-media-config.yaml /data/profiles/guest-media/config.yaml
               umask 077
               printf 'LITELLM_MASTER_KEY=%s\nAPI_SERVER_KEY=%s\n' "$LITELLM_MASTER_KEY" "$API_SERVER_KEY" > /runtime-secrets/litellm.env
@@ -742,9 +817,10 @@ spec:
               ln -sfn /runtime-secrets/litellm.env /data/profiles/research/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/vision/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/guest/.env
+              ln -sfn /runtime-secrets/litellm.env /data/profiles/guest-skills/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/guest-media/.env
-              touch /data/profiles/user/.no-bundled-skills /data/profiles/agent/.no-bundled-skills /data/profiles/research/.no-bundled-skills /data/profiles/vision/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
-              chown 10000:10000 /data/profiles/user/.no-bundled-skills /data/profiles/agent/.no-bundled-skills /data/profiles/research/.no-bundled-skills /data/profiles/vision/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
+              touch /data/profiles/user/.no-bundled-skills /data/profiles/agent/.no-bundled-skills /data/profiles/research/.no-bundled-skills /data/profiles/vision/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-skills/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
+              chown 10000:10000 /data/profiles/user/.no-bundled-skills /data/profiles/agent/.no-bundled-skills /data/profiles/research/.no-bundled-skills /data/profiles/vision/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-skills/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
               chown -R 10000:10000 /data/profiles/vision
           env:
             - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
@@ -760,7 +836,20 @@ spec:
             - {name: config, mountPath: /bootstrap/vision-config.yaml, subPath: vision-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/vision-soul.md, subPath: vision-soul.md, readOnly: true}
             - {name: config, mountPath: /bootstrap/guest-config.yaml, subPath: guest-config.yaml, readOnly: true}
+            - {name: config, mountPath: /bootstrap/guest-skills-config.yaml, subPath: guest-skills-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/guest-media-config.yaml, subPath: guest-media-config.yaml, readOnly: true}
+        - name: seed-guest-skills-profile
+          image: nousresearch/hermes-agent:v2026.9.7
+          command:
+            - sh
+            - -ec
+            - |
+              install -d -m 0755 -o 10000 -g 10000 /data/profiles/guest-skills/skills/daiki/graft-code-intelligence
+              install -m 0644 -o 10000 -g 10000 /bootstrap/skill-graft-code-intelligence.md /data/profiles/guest-skills/skills/daiki/graft-code-intelligence/SKILL.md
+              chown -R 10000:10000 /data/profiles/guest-skills/skills
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: config, mountPath: /bootstrap/skill-graft-code-intelligence.md, subPath: skill-graft-code-intelligence.md, readOnly: true}
         - name: seed-skills-profile
           image: nousresearch/hermes-agent:v2026.9.7
           command:

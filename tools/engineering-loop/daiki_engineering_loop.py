@@ -401,6 +401,7 @@ def run_hermes_suite(context:str,namespace:str,report:Report)->None:
         "research":{"maxTools":0,"maxToolBytes":64,"maxSkillsBytes":200},
         "vision":{"maxTools":0,"maxToolBytes":64,"maxSkillsBytes":200},
         "guest":{"maxTools":0,"maxToolBytes":64,"maxSkillsBytes":200},
+        "guest-skills":{"maxTools":3,"maxToolBytes":4200,"maxSkillsBytes":900},
     }
     for profile,budget in budgets.items():
         home=f"/opt/data/profiles/{profile}"
@@ -448,13 +449,14 @@ PYV"""
     cases=[
         ("user","plain-intelligence","Reply exactly HERMES_USER_OK","HERMES_USER_OK",None),
         ("skills","skill-graft","Use skill_view to inspect the installed skill named graft-code-intelligence, then answer with GRAFT_SKILL_OK followed by one token-saving principle from that skill.","GRAFT_SKILL_OK","skills"),
+        ("guest-skills","guest-skill-graft","Use skill_view to inspect the installed skill named graft-code-intelligence, then answer with GUEST_GRAFT_SKILL_OK followed by one safe repository-analysis principle. Do not use any shell or filesystem tool.","GUEST_GRAFT_SKILL_OK","skills"),
         ("skills","skill-document","Use skill_view to inspect the installed skill named daiki-document-analysis, then answer with DOCUMENT_SKILL_OK followed by one rule for bounded attachment excerpts.","DOCUMENT_SKILL_OK","skills"),
         ("agent","delegation","Use delegate_task exactly once for the tiny task 'What is 6 times 7?'. After it returns, answer exactly AGENT_DELEGATION_OK 42.","AGENT_DELEGATION_OK","delegation"),
     ]
     for profile,name,prompt,needle,toolsets in cases:
         token=uuid.uuid4().hex[:12]; usage=f"/tmp/daiki-loop-{token}.json"; home=f"/opt/data/profiles/{profile}"
         toolarg=f" -t {toolsets}" if toolsets else ""
-        platform="HERMES_SESSION_PLATFORM=api_server " if profile=="skills" else ""
+        platform="HERMES_SESSION_PLATFORM=api_server " if profile in {"skills","guest-skills"} else ""
         qprompt=json.dumps(prompt)
         script=f"set -e; {platform}HERMES_HOME={home} /opt/hermes/.venv/bin/hermes -z {qprompt}{toolarg} --usage-file {usage}; echo __USAGE__; cat {usage} 2>/dev/null || true"
         code,out,ms=kubectl_exec(context,namespace,pod,script,240)
@@ -467,7 +469,7 @@ PYV"""
     report.add(Result("curator-dry-run","learning",PASS if code==0 else FAIL,ms,None,out[-300:].replace("\n"," "),{}))
 
 def add_api_coverage(report:Report)->None:
-    covered=["GET /health/live","GET /health/ready","GET /guest/policy","POST /guest/chat","POST /guest/chat/stream","GET /guest/attachments","POST /guest/attachments","GET /guest/attachments/{id}","DELETE /guest/attachments/{id}","POST /guest/generate/file","POST /guest/generate/image"]
+    covered=["GET /health/live","GET /health/ready","GET /guest/policy","GET /guest/capabilities","POST /guest/chat","POST /guest/chat/stream","GET /guest/attachments","POST /guest/attachments","GET /guest/attachments/{id}","DELETE /guest/attachments/{id}","POST /guest/generate/file","POST /guest/generate/image"]
     isolated=["GET /models","GET /usage","POST /chat","POST /chat/stream","chat-sessions CRUD/runs","authenticated attachments CRUD","quota reset/use","admin summary/queues/audit","admin providers/models/aliases CRUD","admin users/roles/status/quota CRUD","admin API keys/quota CRUD","admin token/guest policy mutation","Gmail OAuth connect/test/disconnect"]
     blocked=["guest image generation: external image provider credential"]
     report.add(Result("safe-prod","coverage",PASS,0,None,f"{len(covered)} route contracts covered",{"routes":covered}))
