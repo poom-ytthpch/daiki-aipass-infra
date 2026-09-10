@@ -21,6 +21,8 @@ data:
     gateway:
       multiplex_profiles: true
       multiplex_profile_allowlist:
+        - user
+        - research
         - guest
         - guest-media
       api_server:
@@ -59,6 +61,110 @@ data:
         - code_execution
         - cronjob
         - memory
+        - messaging
+        - homeassistant
+        - spotify
+        - discord
+        - discord_admin
+  user-config.yaml: |
+    _config_version: 41
+    model:
+      default: groq-qwen-qwen3.8-27b
+      provider: custom
+      base_url: http://litellm:4000/v1
+      api_key: ${LITELLM_MASTER_KEY}
+    auxiliary:
+      title_generation:
+        enabled: false
+        provider: main
+      compression:
+        provider: main
+        max_concurrency: 2
+    gateway:
+      platforms:
+        api_server:
+          enabled: false
+    platform_toolsets:
+      api_server:
+        - skills
+        - todo
+        - delegation
+        - session_search
+        - clarify
+    skills:
+      write_approval: false
+    terminal:
+      backend: docker
+      docker_network: false
+      docker_mount_cwd_to_workspace: false
+    tool_loop_guardrails:
+      non_interactive_hard_stop_enabled: true
+    agent:
+      api_max_retries: 1
+      disabled_toolsets:
+        - web
+        - browser
+        - terminal
+        - file
+        - code_execution
+        - vision
+        - image_gen
+        - video
+        - video_gen
+        - x_search
+        - memory
+        - context_engine
+        - cronjob
+        - computer_use
+        - messaging
+        - homeassistant
+        - spotify
+        - discord
+        - discord_admin
+  research-config.yaml: |
+    _config_version: 41
+    model:
+      default: groq-openai-gpt-oss-20b
+      provider: custom
+      base_url: http://litellm:4000/v1
+      api_key: ${LITELLM_MASTER_KEY}
+    auxiliary:
+      title_generation:
+        enabled: false
+        provider: main
+      compression:
+        provider: main
+    gateway:
+      platforms:
+        api_server:
+          enabled: false
+    platform_toolsets:
+      api_server: []
+    terminal:
+      backend: docker
+      docker_network: false
+      docker_mount_cwd_to_workspace: false
+    agent:
+      api_max_retries: 1
+      disabled_toolsets:
+        - web
+        - browser
+        - terminal
+        - file
+        - code_execution
+        - vision
+        - image_gen
+        - video
+        - video_gen
+        - x_search
+        - skills
+        - todo
+        - memory
+        - context_engine
+        - session_search
+        - delegation
+        - cronjob
+        - computer_use
         - messaging
         - homeassistant
         - spotify
@@ -197,18 +303,22 @@ spec:
             - sh
             - -ec
             - |
-              install -d -m 0750 -o 10000 -g 10000 /data/profiles/guest /data/profiles/guest-media
+              install -d -m 0750 -o 10000 -g 10000 /data/profiles/user /data/profiles/research /data/profiles/guest /data/profiles/guest-media
               install -m 0600 -o 10000 -g 10000 /bootstrap/config.yaml /data/config.yaml
+              install -m 0600 -o 10000 -g 10000 /bootstrap/user-config.yaml /data/profiles/user/config.yaml
+              install -m 0600 -o 10000 -g 10000 /bootstrap/research-config.yaml /data/profiles/research/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/guest-config.yaml /data/profiles/guest/config.yaml
               install -m 0600 -o 10000 -g 10000 /bootstrap/guest-media-config.yaml /data/profiles/guest-media/config.yaml
               umask 077
               printf 'LITELLM_MASTER_KEY=%s\nAPI_SERVER_KEY=%s\n' "$LITELLM_MASTER_KEY" "$API_SERVER_KEY" > /runtime-secrets/litellm.env
               chown 10000:10000 /runtime-secrets/litellm.env
               ln -sfn /runtime-secrets/litellm.env /data/.env
+              ln -sfn /runtime-secrets/litellm.env /data/profiles/user/.env
+              ln -sfn /runtime-secrets/litellm.env /data/profiles/research/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/guest/.env
               ln -sfn /runtime-secrets/litellm.env /data/profiles/guest-media/.env
-              touch /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
-              chown 10000:10000 /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
+              touch /data/profiles/research/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
+              chown 10000:10000 /data/profiles/research/.no-bundled-skills /data/profiles/guest/.no-bundled-skills /data/profiles/guest-media/.no-bundled-skills
           env:
             - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
             - {name: API_SERVER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: hermes-api-key}}}
@@ -216,6 +326,8 @@ spec:
             - {name: data, mountPath: /data}
             - {name: runtime-secrets, mountPath: /runtime-secrets}
             - {name: config, mountPath: /bootstrap/config.yaml, subPath: config.yaml, readOnly: true}
+            - {name: config, mountPath: /bootstrap/user-config.yaml, subPath: user-config.yaml, readOnly: true}
+            - {name: config, mountPath: /bootstrap/research-config.yaml, subPath: research-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/guest-config.yaml, subPath: guest-config.yaml, readOnly: true}
             - {name: config, mountPath: /bootstrap/guest-media-config.yaml, subPath: guest-media-config.yaml, readOnly: true}
       containers:
