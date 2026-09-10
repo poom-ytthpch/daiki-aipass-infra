@@ -27,7 +27,8 @@ data:
         max_concurrent_runs: 4
       platforms:
         api_server:
-          direct_model_requests: true
+          extra:
+            direct_model_requests: true
     # Logged-in Daiki users get Hermes' safe agent surface and skill learning.
     # Host shell/filesystem/code execution stay disabled until a real isolated
     # execution backend is available.
