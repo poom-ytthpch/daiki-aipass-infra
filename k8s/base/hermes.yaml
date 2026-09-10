@@ -297,6 +297,26 @@ spec:
     spec:
       automountServiceAccountToken: false
       initContainers:
+        - name: patch-clarify-schema
+          image: nousresearch/hermes-agent:v2026.9.7
+          command:
+            - sh
+            - -ec
+            - |
+              python - <<'PY'
+              from pathlib import Path
+              src = Path('/opt/hermes/tools/clarify_tool.py').read_text()
+              needle = '"maxItems": MAX_CHOICES,'
+              if src.count(needle) != 1:
+                  raise SystemExit('clarify schema patch target changed; refusing to start')
+              # Provider-side tool validation happens before clarify_tool() can normalize.
+              # Accept a bounded oversized model call here; _clean_choices() still caps UI choices to 4.
+              src = src.replace(needle, '"maxItems": 16,', 1)
+              Path('/tool-overrides/clarify_tool.py').write_text(src)
+              PY
+              chmod 0444 /tool-overrides/clarify_tool.py
+          volumeMounts:
+            - {name: tool-overrides, mountPath: /tool-overrides}
         - name: bootstrap-config
           image: busybox:1.37.0
           command:
@@ -366,11 +386,14 @@ spec:
           volumeMounts:
             - {name: data, mountPath: /opt/data}
             - {name: runtime-secrets, mountPath: /runtime-secrets, readOnly: true}
+            - {name: tool-overrides, mountPath: /opt/hermes/tools/clarify_tool.py, subPath: clarify_tool.py, readOnly: true}
       volumes:
         - name: data
           persistentVolumeClaim: {claimName: hermes-data}
         - name: runtime-secrets
           emptyDir: {medium: Memory}
+        - name: tool-overrides
+          emptyDir: {}
         - name: config
           configMap: {name: hermes-config}
 ---
