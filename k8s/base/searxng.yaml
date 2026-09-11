@@ -5,7 +5,13 @@ metadata:
   namespace: daiki-ai-passport
 data:
   settings.yml: |
-    use_default_settings: true
+    # Daiki research is intentionally Google-only. SearXNG is retained as a
+    # private transport/normalization layer, but every non-Google engine is
+    # removed at settings load time so callers cannot silently mix providers.
+    use_default_settings:
+      engines:
+        keep_only:
+          - google cse
     general:
       debug: false
       instance_name: "Daiki Research"
