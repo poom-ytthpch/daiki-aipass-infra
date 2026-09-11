@@ -16,7 +16,7 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: backend
-          image: ghcr.io/poom-ytthpch/daiki-ai-passport-backend:sha-8ca2fb1
+          image: ghcr.io/poom-ytthpch/daiki-ai-passport-backend:sha-71888cb
           ports:
             - {name: http, containerPort: 8080}
           env:
@@ -40,8 +40,8 @@ spec:
             - {name: HERMES_API_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: hermes-api-key}}}
             - {name: HERMES_FALLBACK_TO_LITELLM, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: hermes-fallback-to-litellm}}}
             - {name: SEARXNG_BASE_URL, value: "http://searxng:8080"}
-            - {name: WEB_RESEARCH_MAX_RESULTS, value: "5"}
-            - {name: WEB_RESEARCH_FETCH_PAGES, value: "3"}
+            - {name: WEB_RESEARCH_MAX_RESULTS, value: "8"}
+            - {name: WEB_RESEARCH_FETCH_PAGES, value: "5"}
             - {name: LITELLM_MASTER_KEY, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: litellm-master-key}}}
             - {name: DATABASE_URL, valueFrom: {secretKeyRef: {name: daiki-ai-passport-secrets, key: backend-database-url}}}
             - {name: REDIS_ADDR, value: "daiki-redis:6379"}
