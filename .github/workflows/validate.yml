@@ -21,6 +21,6 @@ jobs:
         run: kubeconform -strict -summary -ignore-missing-schemas /tmp/daiki.yaml
       - name: Check for committed secrets
         run: |
-          if grep -RIE 'BEGIN PRIVATE KEY|sk-[A-Za-z0-9]{16,}|password:[[:space:]]+[^C<]' --exclude='secret.example.yaml' .; then
+          if grep -RIE 'BEGIN PRIVATE KEY|sk-[A-Za-z0-9]{16,}|password:[[:space:]]+[^C<]' --exclude='secret.example.yaml' --exclude='validate.yml' .; then
             echo 'Potential secret detected'; exit 1
           fi
