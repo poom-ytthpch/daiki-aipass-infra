@@ -11,6 +11,7 @@ data:
     use_default_settings:
       engines:
         keep_only:
+          - google
           - google cse
     general:
       debug: false
