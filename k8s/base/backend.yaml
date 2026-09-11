@@ -49,6 +49,7 @@ spec:
             - {name: MODEL_BALANCED, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: model-balanced}}}
             - {name: MODEL_DEEP, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: model-deep}}}
             - {name: MODEL_VISION, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: model-vision}}}
+            - {name: OPENROUTER_IMAGE_MODEL, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: openrouter-image-model}}}
             - {name: INFERENCE_GLOBAL_CONCURRENCY, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: inference-global-concurrency}}}
             - {name: INFERENCE_FAST_CONCURRENCY, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: inference-fast-concurrency}}}
             - {name: INFERENCE_DEEP_CONCURRENCY, valueFrom: {configMapKeyRef: {name: daiki-ai-passport-runtime, key: inference-deep-concurrency}}}

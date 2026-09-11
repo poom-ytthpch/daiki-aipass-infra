@@ -11,6 +11,7 @@ data:
   model-balanced: "test-nvidia-nemotron-3-nano-4b"
   model-deep: "test-nvidia-nemotron-3-nano-4b"
   model-vision: "groq-qwen-qwen3.8-27b"
+  openrouter-image-model: "google/gemini-3.1-flash-lite-image"
   inference-global-concurrency: "4"
   inference-fast-concurrency: "4"
   inference-deep-concurrency: "1"
