@@ -11,6 +11,7 @@ data:
       provider: custom
       base_url: http://litellm:4000/v1
       api_key: ${LITELLM_MASTER_KEY}
+      max_tokens: 900
     providers:
       custom:
         models:
@@ -158,6 +159,7 @@ data:
       provider: custom
       base_url: http://litellm:4000/v1
       api_key: ${LITELLM_MASTER_KEY}
+      max_tokens: 900
     providers:
       custom:
         models:
@@ -483,6 +485,7 @@ data:
       provider: custom
       base_url: http://litellm:4000/v1
       api_key: ${LITELLM_MASTER_KEY}
+      max_tokens: 900
     providers:
       custom:
         models:
